@@ -5,9 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { FileText, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { FileText, Loader2, AlertCircle, CheckCircle2, Copy, Check, AlertTriangle } from 'lucide-react';
 import { z } from 'zod';
-import { getBrandedName, isTestEnvironment } from '@/lib/environment';
+import { getBrandedName, getEnvironment, isTestEnvironment } from '@/lib/environment';
 
 const passwordSchema = z.object({
   password: z.string().min(6, 'Password must be at least 6 characters'),
@@ -16,6 +16,12 @@ const passwordSchema = z.object({
   message: "Passwords don't match",
   path: ['confirmPassword'],
 });
+
+// Environment URLs for mismatch redirect
+const ENV_URLS = {
+  test: import.meta.env.VITE_TEST_URL || 'https://id-preview--bce1c03f-b940-4820-b637-57ba85d99401.lovable.app',
+  production: import.meta.env.VITE_PROD_URL || 'https://po-maker-magic.lovable.app',
+};
 
 export default function ResetPassword() {
   const { updatePassword, user, loading } = useAuth();
@@ -26,11 +32,28 @@ export default function ResetPassword() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [copied, setCopied] = useState(false);
   
-  // Check if this reset is for a specific environment
+  // Environment mismatch detection
   const envFromUrl = searchParams.get('env') as 'production' | 'test' | null;
+  const currentEnv = getEnvironment();
+  const envMismatch = envFromUrl && envFromUrl !== currentEnv;
+  
+  // Build the correct URL for the other environment
+  const correctEnvUrl = envMismatch 
+    ? `${ENV_URLS[envFromUrl]}${window.location.pathname}${window.location.search}${window.location.hash}`
+    : null;
+  
   const isTest = envFromUrl === 'test' || isTestEnvironment();
   const brandName = getBrandedName();
+
+  const handleCopyUrl = async () => {
+    if (correctEnvUrl) {
+      await navigator.clipboard.writeText(correctEnvUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
 
   useEffect(() => {
     // After successful password reset, redirect to upload
@@ -41,6 +64,70 @@ export default function ResetPassword() {
       return () => clearTimeout(timer);
     }
   }, [success, navigate]);
+
+  // Environment mismatch blocking screen
+  if (envMismatch && correctEnvUrl) {
+    const envLabel = envFromUrl === 'test' ? 'Test Environment' : 'Production';
+    const envBadgeClass = envFromUrl === 'test' ? 'env-test-badge' : 'bg-primary/10 text-primary';
+    
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-background px-4">
+        <Link to="/" className="flex items-center gap-2 mb-8">
+          <div className="h-8 w-8 rounded bg-primary flex items-center justify-center">
+            <FileText className="h-4 w-4 text-primary-foreground" />
+          </div>
+          <span className="font-semibold text-xl">Continuity</span>
+        </Link>
+
+        <Card className="w-full max-w-md border-amber-500/50 border-2">
+          <CardHeader className="text-center pb-4">
+            <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-amber-500/10 flex items-center justify-center">
+              <AlertTriangle className="h-6 w-6 text-amber-500" />
+            </div>
+            <CardTitle className="text-xl font-semibold">Wrong Environment</CardTitle>
+            <CardDescription className="text-sm mt-2">
+              This password reset link is for{' '}
+              <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${envBadgeClass}`}>
+                {envLabel}
+              </span>
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground text-center">
+              You're currently on <strong>{currentEnv === 'test' ? 'Test' : 'Production'}</strong>. 
+              Open this link in the correct environment to reset your password.
+            </p>
+            
+            <div className="bg-muted rounded-lg p-3 text-xs font-mono break-all text-muted-foreground">
+              {correctEnvUrl}
+            </div>
+            
+            <Button 
+              onClick={handleCopyUrl} 
+              className="w-full gap-2"
+              variant={copied ? "secondary" : "default"}
+            >
+              {copied ? (
+                <>
+                  <Check className="h-4 w-4" />
+                  Copied!
+                </>
+              ) : (
+                <>
+                  <Copy className="h-4 w-4" />
+                  Copy {envLabel} Link
+                </>
+              )}
+            </Button>
+            
+            <p className="text-xs text-muted-foreground text-center">
+              Or open the link directly in your {envLabel.toLowerCase()} browser session.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
