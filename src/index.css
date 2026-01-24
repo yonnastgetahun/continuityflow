@@ -149,36 +149,99 @@
 }
 
 @layer components {
-  /* Card surfaces */
+  /* ========================================
+     PRODUCTION-GRADE THEME SYSTEM
+     Color Grammar:
+     - Blue = intent (primary actions, active states)
+     - Gray = structure (borders, dividers, secondary text)
+     - Black/dark = authority (headings, totals, final states)
+     - Red/yellow/green = ONLY errors, warnings, confirmations
+     ======================================== */
+
+  /* Card surfaces - clean, borderless when possible */
   .section-card {
     background: hsl(var(--card));
     border: 1px solid hsl(var(--border));
   }
 
-  /* Trust badge - uses success color sparingly */
+  /* Trust badge - uses success color functionally */
   .trust-badge {
     background: hsl(var(--success) / 0.08);
     color: hsl(var(--success));
   }
 
-  /* Trial/warning banner */
+  /* Trial/warning banner - functional warning only */
   .trial-banner {
     background: hsl(var(--warning) / 0.08);
     border: 1px solid hsl(var(--warning) / 0.2);
   }
 
-  /* Upload zone */
+  /* Upload zone - reduced visual noise */
   .upload-zone {
-    border: 2px dashed hsl(var(--border));
-    transition: border-color 0.15s ease;
+    background: hsl(var(--muted) / 0.3);
+    border: 1.5px dashed hsl(var(--border));
+    transition: all 0.15s ease;
   }
 
-  .upload-zone:hover,
+  .upload-zone:hover {
+    background: hsl(var(--muted) / 0.5);
+    border-color: hsl(var(--muted-foreground) / 0.4);
+  }
+
   .upload-zone.active {
+    background: hsl(var(--primary) / 0.04);
     border-color: hsl(var(--primary));
   }
 
-  /* Confidence indicators - state colors only */
+  /* ========================================
+     STATE PATTERNS (Phase 2 ready)
+     Three-tier state system using tone + contrast
+     ======================================== */
+
+  /* State: Needs Attention - amber, functional only */
+  .state-attention {
+    background: hsl(var(--warning) / 0.08);
+    border: 1px solid hsl(var(--warning) / 0.2);
+  }
+
+  .state-attention-text {
+    color: hsl(var(--warning));
+  }
+
+  /* State: Confirmed - green, functional only */
+  .state-confirmed {
+    background: hsl(var(--success) / 0.06);
+    border: 1px solid hsl(var(--success) / 0.15);
+  }
+
+  .state-confirmed-text {
+    color: hsl(var(--success));
+  }
+
+  /* State: Ready for Approval - blue/primary, confidence signal */
+  .state-ready {
+    background: hsl(var(--primary) / 0.06);
+    border: 1px solid hsl(var(--primary) / 0.15);
+  }
+
+  .state-ready-text {
+    color: hsl(var(--primary));
+  }
+
+  /* State: Error - red, blocking issues only */
+  .state-error {
+    background: hsl(var(--destructive) / 0.08);
+    border: 1px solid hsl(var(--destructive) / 0.2);
+  }
+
+  .state-error-text {
+    color: hsl(var(--destructive));
+  }
+
+  /* ========================================
+     CONFIDENCE INDICATORS (functional)
+     ======================================== */
+
   .confidence-high {
     background: hsl(var(--success) / 0.08);
     color: hsl(var(--success));
@@ -194,7 +257,29 @@
     color: hsl(var(--destructive));
   }
 
-  /* Subtle animations */
+  /* ========================================
+     FORM DENSITY (reduced visual noise)
+     ======================================== */
+
+  /* Relaxed form inputs - more padding, softer borders */
+  .form-field-relaxed {
+    @apply py-3 px-4;
+  }
+
+  /* Section spacing utility */
+  .section-gap {
+    @apply space-y-8;
+  }
+
+  /* Card with generous internal spacing */
+  .card-relaxed {
+    @apply p-6 md:p-8;
+  }
+
+  /* ========================================
+     ANIMATIONS
+     ======================================== */
+
   .animate-fade-in {
     animation: fadeIn 0.3s ease-out forwards;
   }

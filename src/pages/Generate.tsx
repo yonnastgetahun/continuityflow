@@ -181,33 +181,33 @@ export default function GeneratePage() {
 
   return (
     <AppLayout>
-      <div className="max-w-4xl mx-auto space-y-6">
+      <div className="max-w-3xl mx-auto section-gap">
         <div>
-          <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="gap-2 mb-2">
+          <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="gap-2 mb-2 -ml-2">
             <ArrowLeft className="h-4 w-4" />
             Back
           </Button>
-          <h1 className="font-display text-3xl font-bold">Generate Purchase Order</h1>
-          <p className="text-muted-foreground">
-            Review and customize your purchase order before exporting.
+          <h1 className="text-2xl font-semibold">Generate Purchase Order</h1>
+          <p className="text-muted-foreground text-sm">
+            Review and customize before exporting.
           </p>
         </div>
 
         {/* PO Preview Card */}
-        <Card className="animate-slide-up border-2">
-          <CardHeader className="hero-gradient text-primary-foreground rounded-t-lg">
+        <Card className="animate-fade-in border">
+          <CardHeader className="bg-secondary border-b">
             <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <FileOutput className="h-5 w-5" />
+              <CardTitle className="flex items-center gap-2 text-lg font-medium">
+                <FileOutput className="h-5 w-5 text-primary" />
                 Purchase Order
               </CardTitle>
               <div className="text-right">
-                <p className="text-sm opacity-80">PO Number</p>
-                <p className="font-mono font-semibold">{poNumber}</p>
+                <p className="text-xs text-muted-foreground">PO Number</p>
+                <p className="font-mono text-sm font-medium">{poNumber}</p>
               </div>
             </div>
           </CardHeader>
-          <CardContent className="pt-6 space-y-6">
+          <CardContent className="pt-6 space-y-8">
             {/* Header Info */}
             <div className="grid md:grid-cols-3 gap-4">
               <div className="space-y-2">

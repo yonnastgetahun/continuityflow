@@ -71,7 +71,7 @@ function ConfidenceBadge({
 }) {
   if (isConfirmed) {
     return (
-      <span className="bg-primary/20 text-primary text-xs px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+      <span className="state-ready text-xs px-2 py-0.5 rounded inline-flex items-center gap-1">
         <UserCheck className="h-3 w-3" />
         Confirmed
       </span>
@@ -79,15 +79,15 @@ function ConfidenceBadge({
   }
 
   const config = {
-    high: { icon: Check, className: 'bg-green-500/20 text-green-600 dark:text-green-400', label: 'High' },
-    medium: { icon: AlertTriangle, className: 'bg-yellow-500/20 text-yellow-600 dark:text-yellow-400', label: 'Review' },
-    low: { icon: Info, className: 'bg-red-500/20 text-red-600 dark:text-red-400', label: 'Low' },
+    high: { icon: Check, className: 'confidence-high', label: 'High' },
+    medium: { icon: AlertTriangle, className: 'confidence-medium', label: 'Review' },
+    low: { icon: Info, className: 'confidence-low', label: 'Low' },
   };
   
   const { icon: Icon, className, label } = config[confidence];
   
   return (
-    <span className={`${className} text-xs px-2 py-0.5 rounded-full inline-flex items-center gap-1`}>
+    <span className={`${className} text-xs px-2 py-0.5 rounded inline-flex items-center gap-1`}>
       <Icon className="h-3 w-3" />
       {label}
     </span>
@@ -104,12 +104,12 @@ function RequiredIndicator({ isRequired, isFilled, isConfirmed }: RequiredIndica
   if (!isRequired) return null;
   
   if (isFilled && isConfirmed) {
-    return <Check className="h-3 w-3 text-green-500" />;
+    return <Check className="h-3 w-3 state-confirmed-text" />;
   }
   
   return (
     <span title="Required field">
-      <CircleDot className="h-3 w-3 text-destructive" />
+      <CircleDot className="h-3 w-3 state-error-text" />
     </span>
   );
 }
@@ -410,11 +410,11 @@ export default function ReviewPage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <div>
-            <Button variant="ghost" size="sm" onClick={() => navigate('/upload')} className="gap-2 mb-1">
+            <Button variant="ghost" size="sm" onClick={() => navigate('/upload')} className="gap-2 mb-1 -ml-2">
               <ArrowLeft className="h-4 w-4" />
               Back
             </Button>
-            <h1 className="font-display text-2xl font-bold">Review Extracted Data</h1>
+            <h1 className="text-xl font-semibold">Review Extracted Data</h1>
           </div>
           <Button
             variant="outline"
@@ -429,13 +429,12 @@ export default function ReviewPage() {
 
         {/* Scanned Document Banner */}
         {isScanned && (
-          <div className="flex items-start gap-3 p-4 mb-4 bg-amber-500/10 border border-amber-500/30 rounded-lg animate-scale-in">
-            <ScanLine className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+          <div className="state-attention rounded-lg p-4 mb-4 flex items-start gap-3 animate-fade-in">
+            <ScanLine className="h-5 w-5 state-attention-text flex-shrink-0 mt-0.5" />
             <div>
-              <p className="font-medium text-amber-600 dark:text-amber-400">Scanned PDF Detected</p>
+              <p className="font-medium text-sm state-attention-text">Scanned PDF detected</p>
               <p className="text-sm text-muted-foreground">
-                This appears to be a scanned PDF. OCR is not enabled yet. Please enter fields manually.
-                All fields are set to low confidence until confirmed.
+                OCR is not enabled yet. Please enter fields manually.
               </p>
             </div>
           </div>
@@ -443,16 +442,16 @@ export default function ReviewPage() {
 
         {/* Required Fields Notice */}
         {!requiredFieldsStatus.allValid && (
-          <div className="flex items-start gap-3 p-3 mb-4 bg-muted border rounded-lg">
-            <Info className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+          <div className="rounded-lg p-4 mb-4 bg-muted/50 flex items-start gap-3">
+            <Info className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
             <div>
-              <p className="font-medium text-sm">Required fields must be confirmed</p>
-              <p className="text-xs text-muted-foreground">
-                Edit or verify: <span className={requiredFieldsStatus.vendorName ? 'text-green-600' : 'text-destructive'}>Vendor Name</span>
-                {', '}
-                <span className={requiredFieldsStatus.invoiceDate ? 'text-green-600' : 'text-destructive'}>Invoice Date</span>
-                {', '}
-                <span className={requiredFieldsStatus.total ? 'text-green-600' : 'text-destructive'}>Total</span>
+              <p className="font-medium text-sm">Required fields need confirmation</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                <span className={requiredFieldsStatus.vendorName ? 'state-confirmed-text' : 'state-error-text'}>Vendor Name</span>
+                {' · '}
+                <span className={requiredFieldsStatus.invoiceDate ? 'state-confirmed-text' : 'state-error-text'}>Invoice Date</span>
+                {' · '}
+                <span className={requiredFieldsStatus.total ? 'state-confirmed-text' : 'state-error-text'}>Total</span>
               </p>
             </div>
           </div>

@@ -32,13 +32,13 @@ export function AppLayout({ children }: AppLayoutProps) {
       <TrialBanner />
       
       {/* Top Navigation */}
-      <header className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+      <header className="border-b border-border bg-card sticky top-0 z-50">
+        <div className="container mx-auto px-4 h-14 flex items-center justify-between">
           <Link to="/upload" className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg hero-gradient flex items-center justify-center">
-              <FileText className="h-5 w-5 text-primary-foreground" />
+            <div className="h-7 w-7 rounded bg-primary flex items-center justify-center">
+              <FileText className="h-4 w-4 text-primary-foreground" />
             </div>
-            <span className="font-display font-semibold text-xl text-foreground">PO Maker</span>
+            <span className="font-semibold text-lg text-foreground">Continuity</span>
           </Link>
 
           <nav className="hidden md:flex items-center gap-1">

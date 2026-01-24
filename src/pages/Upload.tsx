@@ -148,19 +148,19 @@ export default function UploadPage() {
 
   return (
     <AppLayout>
-      <div className="max-w-4xl mx-auto space-y-8">
-        <div className="text-center animate-fade-in">
-          <h1 className="font-display text-3xl font-bold mb-2">Upload Documents</h1>
-          <p className="text-muted-foreground">
-            Upload your invoice and optional W9 to extract vendor and billing information.
+      <div className="max-w-3xl mx-auto section-gap">
+        <div className="animate-fade-in">
+          <h1 className="text-2xl font-semibold mb-2">Upload Documents</h1>
+          <p className="text-muted-foreground text-sm">
+            Upload your invoice and optional W-9 to extract vendor and billing information.
           </p>
         </div>
 
         {isReadOnly && (
-          <div className="flex items-center gap-3 p-4 bg-destructive/10 border border-destructive/30 rounded-lg animate-scale-in">
-            <Lock className="h-5 w-5 text-destructive flex-shrink-0" />
+          <div className="state-error rounded-lg p-4 flex items-start gap-3 animate-fade-in">
+            <Lock className="h-5 w-5 state-error-text flex-shrink-0 mt-0.5" />
             <div>
-              <p className="font-medium text-destructive">Read-Only Mode</p>
+              <p className="font-medium state-error-text text-sm">Read-only mode</p>
               <p className="text-sm text-muted-foreground">
                 Your trial has expired. Upgrade to upload and process new documents.
               </p>
@@ -169,10 +169,10 @@ export default function UploadPage() {
         )}
 
         {extractionError && (
-          <div className="flex items-center gap-3 p-4 bg-destructive/10 border border-destructive/30 rounded-lg animate-scale-in">
-            <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0" />
+          <div className="state-error rounded-lg p-4 flex items-start gap-3 animate-fade-in">
+            <AlertCircle className="h-5 w-5 state-error-text flex-shrink-0 mt-0.5" />
             <div>
-              <p className="font-medium text-destructive">Extraction Failed</p>
+              <p className="font-medium state-error-text text-sm">Extraction failed</p>
               <p className="text-sm text-muted-foreground">{extractionError}</p>
             </div>
           </div>
@@ -180,20 +180,19 @@ export default function UploadPage() {
 
         <div className="grid md:grid-cols-2 gap-6">
           {/* Invoice Upload */}
-          <Card className="animate-slide-up" style={{ animationDelay: '0.1s' }}>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5 text-primary" />
+          <Card className="border-0 shadow-none bg-transparent animate-fade-in" style={{ animationDelay: '0.05s' }}>
+            <CardHeader className="px-0 pt-0 pb-3">
+              <CardTitle className="flex items-center gap-2 text-base font-medium">
                 Invoice PDF
-                <span className="text-destructive">*</span>
+                <span className="text-destructive text-sm">*</span>
               </CardTitle>
-              <CardDescription>Required. Upload the invoice to process.</CardDescription>
+              <CardDescription className="text-sm">Required</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-0">
               {invoiceFile ? (
-                <div className="flex items-center justify-between p-4 bg-success/10 border border-success/30 rounded-lg">
+                <div className="state-confirmed rounded-lg p-4 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <FileText className="h-8 w-8 text-success" />
+                    <FileText className="h-6 w-6 state-confirmed-text" />
                     <div>
                       <p className="font-medium text-sm">{invoiceFile.name}</p>
                       <p className="text-xs text-muted-foreground">Ready to extract</p>
@@ -239,20 +238,19 @@ export default function UploadPage() {
           </Card>
 
           {/* W9 Upload */}
-          <Card className="animate-slide-up" style={{ animationDelay: '0.2s' }}>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5 text-accent" />
-                W9 PDF
+          <Card className="border-0 shadow-none bg-transparent animate-fade-in" style={{ animationDelay: '0.1s' }}>
+            <CardHeader className="px-0 pt-0 pb-3">
+              <CardTitle className="flex items-center gap-2 text-base font-medium">
+                W-9 PDF
                 <span className="text-xs font-normal text-muted-foreground">(Optional)</span>
               </CardTitle>
-              <CardDescription>Upload W9 to auto-fill vendor details.</CardDescription>
+              <CardDescription className="text-sm">Auto-fill vendor details</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-0">
               {w9File ? (
-                <div className="flex items-center justify-between p-4 bg-success/10 border border-success/30 rounded-lg">
+                <div className="state-confirmed rounded-lg p-4 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <FileText className="h-8 w-8 text-success" />
+                    <FileText className="h-6 w-6 state-confirmed-text" />
                     <div>
                       <p className="font-medium text-sm">{w9File.name}</p>
                       <p className="text-xs text-muted-foreground">Ready to extract</p>
@@ -299,60 +297,45 @@ export default function UploadPage() {
         </div>
 
         {/* Privacy Toggle */}
-        <Card className="animate-slide-up" style={{ animationDelay: '0.3s' }}>
-          <CardContent className="pt-6">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex items-start gap-3">
-                <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${
-                  isPro ? 'bg-primary/10' : 'bg-muted'
-                }`}>
-                  <Shield className={`h-5 w-5 ${isPro ? 'text-primary' : 'text-muted-foreground'}`} />
+        <div className="p-5 rounded-lg border border-border bg-card animate-fade-in" style={{ animationDelay: '0.15s' }}>
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <Shield className={`h-5 w-5 mt-0.5 ${isPro ? 'text-primary' : 'text-muted-foreground'}`} />
+              <div>
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="store-docs" className="font-medium text-sm">
+                    Store encrypted documents
+                  </Label>
+                  {!isPro && (
+                    <span className="text-xs text-muted-foreground">(Pro)</span>
+                  )}
                 </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="store-docs" className="font-medium">
-                      Store encrypted documents
-                    </Label>
-                    {!isPro && (
-                      <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded font-medium">
-                        PRO
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Keep original PDFs encrypted for future reference.
-                    {!isPro && ' Upgrade to Pro to enable this feature.'}
-                  </p>
-                </div>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Keep original PDFs encrypted for future reference.
+                </p>
               </div>
-              <Switch
-                id="store-docs"
-                checked={storeDocuments}
-                onCheckedChange={setStoreDocuments}
-                disabled={!isPro || isReadOnly}
-              />
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Privacy Notice */}
-        <div className="trust-badge rounded-lg p-4 flex items-start gap-3 animate-fade-in" style={{ animationDelay: '0.4s' }}>
-          <Sparkles className="h-5 w-5 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="font-medium text-sm">Privacy First Processing</p>
-            <p className="text-sm opacity-80">
-              Documents are processed locally in your browser. Only the extracted, confirmed data is saved to your account.
-            </p>
+            <Switch
+              id="store-docs"
+              checked={storeDocuments}
+              onCheckedChange={setStoreDocuments}
+              disabled={!isPro || isReadOnly}
+            />
           </div>
         </div>
 
+        {/* Privacy Notice */}
+        <div className="text-center text-sm text-muted-foreground animate-fade-in" style={{ animationDelay: '0.2s' }}>
+          <p>Documents are processed locally in your browser.</p>
+        </div>
+
         {/* Extract Button */}
-        <div className="flex justify-center animate-slide-up" style={{ animationDelay: '0.5s' }}>
+        <div className="flex justify-center pt-4 animate-fade-in" style={{ animationDelay: '0.25s' }}>
           <Button
             size="lg"
             onClick={handleExtract}
             disabled={!invoiceFile || isReadOnly || isExtracting}
-            className="gap-2 min-w-48"
+            className="gap-2 px-8"
           >
             {isExtracting ? (
               <>
