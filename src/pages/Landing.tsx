@@ -99,38 +99,41 @@ export default function Landing() {
       </header>
 
       {/* Hero Section */}
-      <section className="relative pt-32 pb-20 px-4 overflow-hidden">
+      <section className="relative pt-40 pb-32 px-4 overflow-hidden">
         <HeroBackground />
         <div className="container mx-auto text-center max-w-3xl relative z-10">
-          <h1 className="mb-6 animate-fade-in">
+          <h1 className="mb-8 animate-fade-in leading-[1.1] tracking-tight">
             Keep production moving —
             <br />
             <span className="text-primary">without breaking accounting.</span>
           </h1>
           
-          <p className="text-muted-foreground mb-4 max-w-2xl mx-auto animate-fade-in" style={{ animationDelay: '0.1s' }}>
-            Create clean purchase orders from W-9s and invoices, with confidence before approval.
-            <br />
-            Local-first processing. Only confirmed fields are saved.
-          </p>
-          
-          <p className="text-sm text-muted-foreground mb-8 max-w-2xl mx-auto animate-fade-in" style={{ animationDelay: '0.12s' }}>
-            Continuity is the financial workflow layer between production teams and accounting.
+          <p className="text-lg text-muted-foreground mb-12 max-w-xl mx-auto animate-fade-in leading-relaxed" style={{ animationDelay: '0.1s' }}>
+            Create approval-ready purchase orders from W-9s and invoices — with confidence before approval.
           </p>
 
-          <div className="flex flex-col sm:flex-row gap-3 justify-center animate-fade-in" style={{ animationDelay: '0.15s' }}>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in" style={{ animationDelay: '0.15s' }}>
             <Link to="/login">
-              <Button size="lg" className="gap-2 w-full sm:w-auto">
+              <Button size="lg" className="gap-2 w-full sm:w-auto px-8">
                 Start Free Trial <ArrowRight className="h-4 w-4" />
               </Button>
             </Link>
-            <Button size="lg" variant="outline" className="gap-2 w-full sm:w-auto">
+            <Button size="lg" variant="ghost" className="gap-2 w-full sm:w-auto text-muted-foreground hover:text-foreground">
               Watch Demo
             </Button>
           </div>
 
-          <p className="text-sm text-muted-foreground mt-4 animate-fade-in" style={{ animationDelay: '0.2s' }}>
+          <p className="text-sm text-muted-foreground mt-6 animate-fade-in" style={{ animationDelay: '0.2s' }}>
             No credit card required.
+          </p>
+        </div>
+      </section>
+
+      {/* Category Definition - Editorial placement */}
+      <section className="py-4 px-4">
+        <div className="container mx-auto max-w-3xl text-center">
+          <p className="text-sm text-muted-foreground">
+            Continuity is the financial workflow layer between production teams and accounting.
           </p>
         </div>
       </section>
