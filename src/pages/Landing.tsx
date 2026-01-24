@@ -102,7 +102,7 @@ export default function Landing() {
       <section className="relative pt-40 pb-32 px-4 overflow-hidden">
         <HeroBackground />
         <div className="container mx-auto text-center max-w-3xl relative z-10">
-          <h1 className="mb-8 animate-fade-in leading-[1.1] tracking-tight">
+          <h1 className="mb-8 animate-fade-in leading-[1.1] tracking-tight text-4xl sm:text-5xl md:text-6xl font-semibold">
             Keep production moving —
             <br />
             <span className="text-primary">without breaking accounting.</span>
