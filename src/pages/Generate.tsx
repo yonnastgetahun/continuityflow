@@ -116,7 +116,24 @@ export default function GeneratePage() {
       if (error) throw error;
 
       toast.success('Purchase Order generated!');
-      navigate('/exported', { state: { poId: po.id, poNumber } });
+      navigate('/exported', { 
+        state: { 
+          poId: po.id, 
+          poNumber,
+          poData: {
+            poNumber,
+            poDate,
+            vendorName,
+            vendorAddress,
+            shipTo,
+            billTo,
+            subtotal,
+            tax,
+            total,
+            notes,
+          }
+        } 
+      });
     } catch (error) {
       console.error('Error generating PO:', error);
       toast.error('Failed to generate PO. Please try again.');

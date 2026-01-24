@@ -8,10 +8,21 @@ import {
   ArrowRight,
   ClipboardList
 } from 'lucide-react';
+import { downloadPoPdf, type POData } from '@/lib/generatePoPdf';
+import { toast } from 'sonner';
 
 export default function ExportedPage() {
   const location = useLocation();
-  const { poNumber } = location.state || { poNumber: 'PO-UNKNOWN' };
+  const { poNumber, poData } = location.state || { poNumber: 'PO-UNKNOWN', poData: null };
+
+  const handleDownload = () => {
+    if (!poData) {
+      toast.error('PDF data not available');
+      return;
+    }
+    downloadPoPdf(poData as POData);
+    toast.success('PDF downloaded!');
+  };
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4">
@@ -37,7 +48,13 @@ export default function ExportedPage() {
                   <p className="text-sm text-muted-foreground">Purchase Order Document</p>
                 </div>
               </div>
-              <Button variant="outline" size="sm" className="gap-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="gap-2"
+                onClick={handleDownload}
+                disabled={!poData}
+              >
                 <Download className="h-4 w-4" />
                 Download
               </Button>
