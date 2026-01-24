@@ -7,7 +7,6 @@ import {
   Lock,
   CheckCircle, 
   ArrowRight, 
-  Upload,
   ClipboardCheck,
   FileCheck,
   Users,
@@ -47,13 +46,13 @@ const steps = [
   },
   {
     step: "2",
-    title: "Review & confirm",
+    title: "Review and confirm",
     description: "Review extracted fields with confidence indicators. Fix only what needs attention."
   },
   {
     step: "3",
     title: "Generate a clean PO",
-    description: "Create a professional purchase order in seconds and export as PDF — ready for approval."
+    description: "Create a professional purchase order in seconds and export as PDF, ready for approval."
   }
 ];
 
@@ -72,7 +71,7 @@ const audiences = [
   },
   {
     icon: Users,
-    title: "Line Producers & Production Managers",
+    title: "Line Producers and Production Managers",
     description: "Approve faster with fewer surprises and cleaner downstream records."
   }
 ];
@@ -81,15 +80,15 @@ export default function Landing() {
   return (
     <div className="min-h-screen bg-background">
       {/* Navigation */}
-      <header className="border-b border-border bg-card/80 backdrop-blur-sm fixed w-full z-50">
+      <header className="border-b border-border bg-card fixed w-full z-50">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-md bg-primary flex items-center justify-center">
+            <div className="h-8 w-8 rounded bg-primary flex items-center justify-center">
               <FileText className="h-4 w-4 text-primary-foreground" />
             </div>
             <div className="flex items-baseline gap-2">
-              <span className="font-semibold text-lg tracking-tight">Continuity</span>
-              <span className="text-xs text-muted-foreground">PO Maker (Beta)</span>
+              <span className="font-semibold text-lg">Continuity</span>
+              <span className="text-sm text-muted-foreground">PO Maker (Beta)</span>
             </div>
           </div>
           <Link to="/login">
@@ -99,26 +98,27 @@ export default function Landing() {
       </header>
 
       {/* Hero Section */}
-      <section className="pt-28 pb-16 px-4">
+      <section className="pt-32 pb-20 px-4">
         <div className="container mx-auto text-center max-w-3xl">
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-semibold mb-5 leading-tight animate-fade-in">
-            Keep production moving —<br />
-            <span className="hero-gradient-text">without breaking accounting.</span>
+          <h1 className="mb-6 animate-fade-in">
+            Keep production moving —
+            <br />
+            <span className="text-primary">without breaking accounting.</span>
           </h1>
           
-          <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto leading-relaxed animate-fade-in" style={{ animationDelay: '0.1s' }}>
+          <p className="text-muted-foreground mb-8 max-w-2xl mx-auto animate-fade-in" style={{ animationDelay: '0.1s' }}>
             Create clean purchase orders from W-9s and invoices, with confidence before approval.
-            <br className="hidden sm:block" />
-            <span className="text-foreground/70">Local-first processing. Only confirmed fields are saved.</span>
+            <br />
+            Local-first processing. Only confirmed fields are saved.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-3 justify-center animate-fade-in" style={{ animationDelay: '0.15s' }}>
             <Link to="/login">
-              <Button size="lg" className="gap-2 w-full sm:w-auto px-6">
+              <Button size="lg" className="gap-2 w-full sm:w-auto">
                 Start Free Trial <ArrowRight className="h-4 w-4" />
               </Button>
             </Link>
-            <Button size="lg" variant="outline" className="gap-2 w-full sm:w-auto px-6">
+            <Button size="lg" variant="outline" className="gap-2 w-full sm:w-auto">
               Watch Demo
             </Button>
           </div>
@@ -130,14 +130,14 @@ export default function Landing() {
       </section>
 
       {/* Value Proof Strip */}
-      <section className="py-8 px-4 border-y border-border bg-muted/30">
+      <section className="py-6 px-4 border-y border-border bg-secondary">
         <div className="container mx-auto max-w-4xl">
-          <div className="flex flex-wrap justify-center gap-x-10 gap-y-4">
+          <div className="flex flex-wrap justify-center gap-x-12 gap-y-4">
             {valueProof.map((item, index) => {
               const Icon = item.icon;
               return (
                 <div key={index} className="flex items-center gap-2 text-sm text-foreground">
-                  <Icon className="h-4 w-4 text-accent" />
+                  <Icon className="h-4 w-4 text-primary" />
                   <span>{item.text}</span>
                 </div>
               );
@@ -147,10 +147,10 @@ export default function Landing() {
       </section>
 
       {/* Pain Points */}
-      <section className="py-20 px-4">
+      <section className="py-24 px-4">
         <div className="container mx-auto max-w-5xl">
-          <div className="text-center mb-12">
-            <h2 className="text-2xl md:text-3xl font-semibold mb-3">
+          <div className="text-center mb-16">
+            <h2 className="mb-4">
               Sound familiar?
             </h2>
             <p className="text-muted-foreground max-w-xl mx-auto">
@@ -158,20 +158,19 @@ export default function Landing() {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-5">
+          <div className="grid md:grid-cols-3 gap-6">
             {painPoints.map((point, index) => {
               const Icon = point.icon;
               return (
                 <div 
                   key={index} 
-                  className="section-card rounded-lg p-6 animate-fade-in" 
-                  style={{ animationDelay: `${0.05 * index}s` }}
+                  className="section-card rounded-lg p-6"
                 >
-                  <div className="h-10 w-10 rounded-md bg-destructive/8 flex items-center justify-center mb-4">
+                  <div className="h-10 w-10 rounded bg-destructive/10 flex items-center justify-center mb-4">
                     <Icon className="h-5 w-5 text-destructive" />
                   </div>
-                  <h3 className="font-semibold text-base mb-2">{point.title}</h3>
-                  <p className="text-muted-foreground text-sm leading-relaxed">{point.description}</p>
+                  <h3 className="mb-2">{point.title}</h3>
+                  <p className="text-sm text-muted-foreground">{point.description}</p>
                 </div>
               );
             })}
@@ -180,10 +179,10 @@ export default function Landing() {
       </section>
 
       {/* How It Works */}
-      <section className="py-20 px-4 bg-muted/20">
+      <section className="py-24 px-4 bg-secondary">
         <div className="container mx-auto max-w-5xl">
-          <div className="text-center mb-12">
-            <h2 className="text-2xl md:text-3xl font-semibold mb-3">
+          <div className="text-center mb-16">
+            <h2 className="mb-4">
               How it works
             </h2>
             <p className="text-muted-foreground max-w-xl mx-auto">
@@ -191,22 +190,21 @@ export default function Landing() {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid md:grid-cols-3 gap-10">
             {steps.map((step, index) => (
               <div 
                 key={index} 
-                className="relative animate-fade-in" 
-                style={{ animationDelay: `${0.05 * index}s` }}
+                className="relative"
               >
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                  <div className="h-8 w-8 rounded-full border-2 border-primary flex items-center justify-center">
                     <span className="text-sm font-semibold text-primary">{step.step}</span>
                   </div>
-                  <h3 className="font-semibold text-base">{step.title}</h3>
+                  <h3>{step.title}</h3>
                 </div>
-                <p className="text-muted-foreground text-sm leading-relaxed pl-11">{step.description}</p>
+                <p className="text-sm text-muted-foreground pl-11">{step.description}</p>
                 {index < steps.length - 1 && (
-                  <div className="hidden md:block absolute top-4 -right-4 text-border">
+                  <div className="hidden md:block absolute top-4 -right-5 text-border">
                     <ChevronRight className="h-5 w-5" />
                   </div>
                 )}
@@ -216,26 +214,26 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Privacy & Security */}
-      <section className="py-20 px-4 bg-sidebar text-sidebar-foreground">
+      {/* Privacy Section */}
+      <section className="py-24 px-4 bg-sidebar text-sidebar-foreground">
         <div className="container mx-auto max-w-3xl text-center">
-          <div className="inline-flex items-center gap-2 trust-badge px-3 py-1.5 rounded-full text-xs font-medium mb-5">
-            <Lock className="h-3.5 w-3.5" />
+          <div className="inline-flex items-center gap-2 trust-badge px-3 py-1.5 rounded text-sm font-medium mb-6">
+            <Lock className="h-4 w-4" />
             Privacy-first
           </div>
           
-          <h2 className="text-2xl md:text-3xl font-semibold mb-5">
+          <h2 className="mb-6">
             Your data stays yours.
           </h2>
           
-          <p className="text-sidebar-foreground/75 mb-8 max-w-xl mx-auto leading-relaxed">
+          <p className="text-sidebar-foreground/80 mb-10 max-w-xl mx-auto">
             Production finance involves sensitive information. Continuity processes documents locally and stores only the structured data you explicitly confirm. No documents are uploaded unless you opt in.
           </p>
 
-          <div className="grid sm:grid-cols-2 gap-3 max-w-md mx-auto text-left">
+          <div className="grid sm:grid-cols-2 gap-4 max-w-md mx-auto text-left">
             {privacyFeatures.map((item, index) => (
-              <div key={index} className="flex items-center gap-2.5 text-sm">
-                <CheckCircle className="h-4 w-4 text-accent flex-shrink-0" />
+              <div key={index} className="flex items-center gap-3 text-sm">
+                <CheckCircle className="h-4 w-4 text-success flex-shrink-0" />
                 <span className="text-sidebar-foreground/90">{item}</span>
               </div>
             ))}
@@ -244,10 +242,10 @@ export default function Landing() {
       </section>
 
       {/* Audience */}
-      <section className="py-20 px-4">
+      <section className="py-24 px-4">
         <div className="container mx-auto max-w-5xl">
-          <div className="text-center mb-12">
-            <h2 className="text-2xl md:text-3xl font-semibold mb-3">
+          <div className="text-center mb-16">
+            <h2 className="mb-4">
               Built for production finance handoffs
             </h2>
             <p className="text-muted-foreground max-w-xl mx-auto">
@@ -255,14 +253,14 @@ export default function Landing() {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-5">
+          <div className="grid md:grid-cols-2 gap-6">
             {audiences.map((audience, index) => {
               const Icon = audience.icon;
               return (
-                <div key={index} className="section-card rounded-lg p-6">
+                <div key={index} className="section-card rounded-lg p-8">
                   <Icon className="h-8 w-8 text-primary mb-4" />
-                  <h3 className="font-semibold text-base mb-2">{audience.title}</h3>
-                  <p className="text-muted-foreground text-sm leading-relaxed">
+                  <h3 className="mb-2">{audience.title}</h3>
+                  <p className="text-sm text-muted-foreground">
                     {audience.description}
                   </p>
                 </div>
@@ -273,12 +271,12 @@ export default function Landing() {
       </section>
 
       {/* Future Direction */}
-      <section className="py-16 px-4 bg-muted/20 border-y border-border">
+      <section className="py-20 px-4 bg-secondary border-y border-border">
         <div className="container mx-auto max-w-2xl text-center">
-          <h2 className="text-xl md:text-2xl font-semibold mb-4">
+          <h2 className="mb-5">
             Continuity is just getting started.
           </h2>
-          <p className="text-muted-foreground leading-relaxed">
+          <p className="text-muted-foreground">
             Today, Continuity helps you generate clean purchase orders.
             <br />
             Next, it will help you catch issues before approval — and prevent problems before they reach accounting.
@@ -287,9 +285,9 @@ export default function Landing() {
       </section>
 
       {/* Final CTA */}
-      <section className="py-20 px-4 bg-primary">
+      <section className="py-24 px-4 bg-primary">
         <div className="container mx-auto max-w-3xl text-center text-primary-foreground">
-          <h2 className="text-2xl md:text-3xl font-semibold mb-4">
+          <h2 className="mb-5">
             Ready to get hours back every week?
           </h2>
           <p className="text-primary-foreground/80 mb-8 max-w-lg mx-auto">
@@ -304,7 +302,7 @@ export default function Landing() {
       </section>
 
       {/* Footer */}
-      <footer className="py-6 px-4 border-t border-border">
+      <footer className="py-8 px-4 border-t border-border">
         <div className="container mx-auto text-center text-sm text-muted-foreground">
           <p>© 2026 Continuity. Built with privacy in mind.</p>
         </div>
