@@ -41,6 +41,7 @@ serve(async (req) => {
     return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   } catch (error) {
     console.error('Error starting trial:', error)
-    return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: corsHeaders })
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    return new Response(JSON.stringify({ error: message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   }
 })
