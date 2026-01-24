@@ -46,16 +46,6 @@ interface PurchaseOrder {
   created_at: string;
 }
 
-interface PurchaseOrder {
-  id: string;
-  po_number: string;
-  po_date: string;
-  total: number | null;
-  status: string | null;
-  vendors?: Vendor | null;
-  created_at: string;
-}
-
 export default function RecordsPage() {
   const navigate = useNavigate();
   const { user, isReadOnly } = useAuth();
