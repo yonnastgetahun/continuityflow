@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { 
   FileText, 
   Check, 
@@ -20,29 +21,41 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { ParsedDocument, ExtractedFields } from '@/lib/pdfParser';
+import { ParsedDocument, ExtractedFields, ExtractedField } from '@/lib/pdfParser';
 
-interface ExtractedField {
-  value: string;
-  confidence: 'high' | 'medium' | 'low';
-  evidence?: string;
-}
-
-function ConfidenceBadge({ confidence }: { confidence: 'high' | 'medium' | 'low' }) {
+function ConfidenceBadge({ confidence, evidence }: { confidence: 'high' | 'medium' | 'low'; evidence?: { docType: string; pageNumber: number; snippet: string } }) {
   const config = {
-    high: { icon: Check, className: 'confidence-high', label: 'High' },
-    medium: { icon: AlertTriangle, className: 'confidence-medium', label: 'Review' },
-    low: { icon: Info, className: 'confidence-low', label: 'Low' },
+    high: { icon: Check, className: 'bg-green-500/20 text-green-600 dark:text-green-400', label: 'High' },
+    medium: { icon: AlertTriangle, className: 'bg-yellow-500/20 text-yellow-600 dark:text-yellow-400', label: 'Review' },
+    low: { icon: Info, className: 'bg-red-500/20 text-red-600 dark:text-red-400', label: 'Low' },
   };
   
   const { icon: Icon, className, label } = config[confidence];
   
-  return (
-    <span className={`${className} text-xs px-2 py-0.5 rounded-full inline-flex items-center gap-1`}>
+  const badge = (
+    <span className={`${className} text-xs px-2 py-0.5 rounded-full inline-flex items-center gap-1 cursor-help`}>
       <Icon className="h-3 w-3" />
       {label}
     </span>
   );
+
+  if (evidence && evidence.pageNumber > 0) {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>{badge}</TooltipTrigger>
+          <TooltipContent className="max-w-xs">
+            <p className="font-medium text-xs mb-1">
+              Source: {evidence.docType.toUpperCase()}, Page {evidence.pageNumber}
+            </p>
+            <p className="text-xs text-muted-foreground italic">"{evidence.snippet}"</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
+  
+  return badge;
 }
 
 interface EditableFieldProps {
@@ -57,18 +70,19 @@ function EditableField({ label, field, value, onChange }: EditableFieldProps) {
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <Label>{label}</Label>
-        <ConfidenceBadge confidence={field.confidence} />
+        <ConfidenceBadge confidence={field.confidence} evidence={field.evidence} />
       </div>
       <Input value={value} onChange={(e) => onChange(e.target.value)} />
-      {field.evidence && (
-        <p className="text-xs text-muted-foreground">
-          <Info className="h-3 w-3 inline mr-1" />
-          {field.evidence}
-        </p>
-      )}
     </div>
   );
 }
+
+// Default field for when no data is available
+const createDefaultField = (): ExtractedField => ({
+  value: '',
+  confidence: 'low',
+  evidence: { docType: 'invoice', pageNumber: 0, snippet: 'Not found in document' },
+});
 
 export default function ReviewPage() {
   const navigate = useNavigate();
@@ -85,25 +99,24 @@ export default function ReviewPage() {
   };
 
   // Default empty extracted data
-  const defaultField: ExtractedField = { value: '', confidence: 'low', evidence: 'Not found' };
-  const fields = extractedFields || {
+  const fields: ExtractedFields = extractedFields || {
     vendor: {
-      name: defaultField,
-      address: defaultField,
-      city: defaultField,
-      state: defaultField,
-      zip: defaultField,
-      taxId: defaultField,
-      email: defaultField,
-      phone: defaultField,
+      name: createDefaultField(),
+      address: createDefaultField(),
+      city: createDefaultField(),
+      state: createDefaultField(),
+      zip: createDefaultField(),
+      taxId: createDefaultField(),
+      email: createDefaultField(),
+      phone: createDefaultField(),
     },
     invoice: {
-      invoiceNumber: defaultField,
-      invoiceDate: defaultField,
-      dueDate: defaultField,
-      subtotal: defaultField,
-      tax: defaultField,
-      total: defaultField,
+      invoiceNumber: createDefaultField(),
+      invoiceDate: createDefaultField(),
+      dueDate: createDefaultField(),
+      subtotal: createDefaultField(),
+      tax: createDefaultField(),
+      total: createDefaultField(),
     },
   };
 
@@ -366,7 +379,7 @@ export default function ReviewPage() {
                 <div className="flex items-center justify-between">
                   <Label>Subtotal</Label>
                   <div className="flex items-center gap-2">
-                    <ConfidenceBadge confidence={fields.invoice.subtotal.confidence} />
+                    <ConfidenceBadge confidence={fields.invoice.subtotal.confidence} evidence={fields.invoice.subtotal.evidence} />
                     <Input 
                       value={subtotal} 
                       onChange={(e) => setSubtotal(e.target.value)}
@@ -378,7 +391,7 @@ export default function ReviewPage() {
                 <div className="flex items-center justify-between">
                   <Label>Tax</Label>
                   <div className="flex items-center gap-2">
-                    <ConfidenceBadge confidence={fields.invoice.tax.confidence} />
+                    <ConfidenceBadge confidence={fields.invoice.tax.confidence} evidence={fields.invoice.tax.evidence} />
                     <Input 
                       value={tax} 
                       onChange={(e) => setTax(e.target.value)}
@@ -391,7 +404,7 @@ export default function ReviewPage() {
                 <div className="flex items-center justify-between">
                   <Label className="text-lg font-semibold">Total</Label>
                   <div className="flex items-center gap-2">
-                    <ConfidenceBadge confidence={fields.invoice.total.confidence} />
+                    <ConfidenceBadge confidence={fields.invoice.total.confidence} evidence={fields.invoice.total.evidence} />
                     <Input 
                       value={total} 
                       onChange={(e) => setTotal(e.target.value)}
