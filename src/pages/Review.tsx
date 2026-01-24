@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { AppLayout } from '@/components/AppLayout';
 import { useAuth } from '@/hooks/useAuth';
 import { PDFViewer } from '@/components/PDFViewer';
+import { ExtractionDebugPanel, ExtractionDebugInfo } from '@/components/ExtractionDebugPanel';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -18,7 +19,6 @@ import {
   ArrowLeft,
   Building2,
   Receipt,
-  FileWarning,
   ExternalLink,
   PanelLeftClose,
   PanelLeft,
@@ -163,7 +163,8 @@ const createDefaultField = (): ExtractedField => ({
 export default function ReviewPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, profile, refreshProfile, isReadOnly } = useAuth();
+  const { user, profile, refreshProfile, isReadOnly, isOwner } = useAuth();
+  const isDevelopment = import.meta.env.DEV;
   const [isSaving, setIsSaving] = useState(false);
   const [showViewer, setShowViewer] = useState(true);
   const [activeDoc, setActiveDoc] = useState<'invoice' | 'w9'>('invoice');
@@ -171,13 +172,14 @@ export default function ReviewPage() {
   const [highlightSnippet, setHighlightSnippet] = useState<string | undefined>();
   const [confirmedFields, setConfirmedFields] = useState<ConfirmedFields>({});
 
-  const { invoiceDoc, w9Doc, extractedFields, invoiceFile, w9File } = (location.state || {}) as {
+  const { invoiceDoc, w9Doc, extractedFields, invoiceFile, w9File, debugInfo } = (location.state || {}) as {
     invoiceDoc?: ParsedDocument;
     w9Doc?: ParsedDocument;
     extractedFields?: ExtractedFields;
     invoiceFile?: File;
     w9File?: File;
     storeDocuments?: boolean;
+    debugInfo?: ExtractionDebugInfo;
   };
 
   const isScanned = invoiceDoc?.isScanned || w9Doc?.isScanned;
@@ -691,6 +693,15 @@ export default function ReviewPage() {
               <p className="text-center text-sm text-muted-foreground pb-4">
                 Saving will start your 7-day free trial with full Pro features.
               </p>
+            )}
+
+            {/* Owner-only Extraction Debug Panel - hidden in production by default */}
+            {isOwner && isDevelopment && (
+              <ExtractionDebugPanel
+                invoiceDoc={invoiceDoc}
+                w9Doc={w9Doc}
+                debugInfo={debugInfo}
+              />
             )}
           </div>
         </div>
