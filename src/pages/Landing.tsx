@@ -51,7 +51,7 @@ const steps = [
   },
   {
     step: "3",
-    title: "Generate a clean PO",
+    title: "Generate an approval-ready PO",
     description: "Create a professional purchase order in seconds and export as PDF, ready for approval."
   }
 ];
@@ -106,10 +106,14 @@ export default function Landing() {
             <span className="text-primary">without breaking accounting.</span>
           </h1>
           
-          <p className="text-muted-foreground mb-8 max-w-2xl mx-auto animate-fade-in" style={{ animationDelay: '0.1s' }}>
+          <p className="text-muted-foreground mb-4 max-w-2xl mx-auto animate-fade-in" style={{ animationDelay: '0.1s' }}>
             Create clean purchase orders from W-9s and invoices, with confidence before approval.
             <br />
             Local-first processing. Only confirmed fields are saved.
+          </p>
+          
+          <p className="text-sm text-muted-foreground mb-8 max-w-2xl mx-auto animate-fade-in" style={{ animationDelay: '0.12s' }}>
+            Continuity is the financial workflow layer between production teams and accounting.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-3 justify-center animate-fade-in" style={{ animationDelay: '0.15s' }}>
@@ -244,6 +248,9 @@ export default function Landing() {
       {/* Audience */}
       <section className="py-24 px-4">
         <div className="container mx-auto max-w-5xl">
+          <p className="text-center text-sm text-muted-foreground mb-12">
+            Designed for film, TV, and commercial production workflows.
+          </p>
           <div className="text-center mb-16">
             <h2 className="mb-4">
               Built for production finance handoffs
