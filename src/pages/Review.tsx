@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { AppLayout } from '@/components/AppLayout';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -15,59 +15,18 @@ import {
   Save,
   ArrowLeft,
   Building2,
-  Receipt
+  Receipt,
+  FileWarning
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { ParsedDocument, ExtractedFields } from '@/lib/pdfParser';
 
 interface ExtractedField {
   value: string;
   confidence: 'high' | 'medium' | 'low';
   evidence?: string;
 }
-
-interface ExtractedData {
-  vendor: {
-    name: ExtractedField;
-    address: ExtractedField;
-    city: ExtractedField;
-    state: ExtractedField;
-    zip: ExtractedField;
-    taxId: ExtractedField;
-    email: ExtractedField;
-    phone: ExtractedField;
-  };
-  invoice: {
-    invoiceNumber: ExtractedField;
-    invoiceDate: ExtractedField;
-    dueDate: ExtractedField;
-    subtotal: ExtractedField;
-    tax: ExtractedField;
-    total: ExtractedField;
-  };
-}
-
-// Mock extracted data (in real app, this would come from an extraction service)
-const mockExtractedData: ExtractedData = {
-  vendor: {
-    name: { value: 'Acme Supplies Inc.', confidence: 'high', evidence: 'Found in W9 header' },
-    address: { value: '123 Business Ave', confidence: 'high', evidence: 'Line 2 of W9' },
-    city: { value: 'San Francisco', confidence: 'high', evidence: 'Address section' },
-    state: { value: 'CA', confidence: 'high', evidence: 'Address section' },
-    zip: { value: '94105', confidence: 'medium', evidence: 'Partially visible' },
-    taxId: { value: '12-3456789', confidence: 'high', evidence: 'TIN field on W9' },
-    email: { value: 'billing@acme.com', confidence: 'medium', evidence: 'Invoice footer' },
-    phone: { value: '(415) 555-0100', confidence: 'low', evidence: 'May be fax number' },
-  },
-  invoice: {
-    invoiceNumber: { value: 'INV-2024-0892', confidence: 'high', evidence: 'Top right of invoice' },
-    invoiceDate: { value: '2024-01-15', confidence: 'high', evidence: 'Invoice date field' },
-    dueDate: { value: '2024-02-14', confidence: 'high', evidence: 'Due date field' },
-    subtotal: { value: '2,450.00', confidence: 'high', evidence: 'Subtotal line' },
-    tax: { value: '196.00', confidence: 'high', evidence: 'Tax line' },
-    total: { value: '2,646.00', confidence: 'high', evidence: 'Total amount' },
-  }
-};
 
 function ConfidenceBadge({ confidence }: { confidence: 'high' | 'medium' | 'low' }) {
   const config = {
@@ -113,34 +72,64 @@ function EditableField({ label, field, value, onChange }: EditableFieldProps) {
 
 export default function ReviewPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, profile, refreshProfile, isReadOnly } = useAuth();
-  const [extractedData] = useState<ExtractedData>(mockExtractedData);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Editable fields
-  const [vendorName, setVendorName] = useState(extractedData.vendor.name.value);
-  const [vendorAddress, setVendorAddress] = useState(extractedData.vendor.address.value);
-  const [vendorCity, setVendorCity] = useState(extractedData.vendor.city.value);
-  const [vendorState, setVendorState] = useState(extractedData.vendor.state.value);
-  const [vendorZip, setVendorZip] = useState(extractedData.vendor.zip.value);
-  const [vendorTaxId, setVendorTaxId] = useState(extractedData.vendor.taxId.value);
-  const [vendorEmail, setVendorEmail] = useState(extractedData.vendor.email.value);
-  const [vendorPhone, setVendorPhone] = useState(extractedData.vendor.phone.value);
+  // Get parsed data from navigation state
+  const { invoiceDoc, w9Doc, extractedFields, storeDocuments } = (location.state || {}) as {
+    invoiceDoc?: ParsedDocument;
+    w9Doc?: ParsedDocument;
+    extractedFields?: ExtractedFields;
+    storeDocuments?: boolean;
+  };
 
-  const [invoiceNumber, setInvoiceNumber] = useState(extractedData.invoice.invoiceNumber.value);
-  const [invoiceDate, setInvoiceDate] = useState(extractedData.invoice.invoiceDate.value);
-  const [dueDate, setDueDate] = useState(extractedData.invoice.dueDate.value);
-  const [subtotal, setSubtotal] = useState(extractedData.invoice.subtotal.value);
-  const [tax, setTax] = useState(extractedData.invoice.tax.value);
-  const [total, setTotal] = useState(extractedData.invoice.total.value);
+  // Default empty extracted data
+  const defaultField: ExtractedField = { value: '', confidence: 'low', evidence: 'Not found' };
+  const fields = extractedFields || {
+    vendor: {
+      name: defaultField,
+      address: defaultField,
+      city: defaultField,
+      state: defaultField,
+      zip: defaultField,
+      taxId: defaultField,
+      email: defaultField,
+      phone: defaultField,
+    },
+    invoice: {
+      invoiceNumber: defaultField,
+      invoiceDate: defaultField,
+      dueDate: defaultField,
+      subtotal: defaultField,
+      tax: defaultField,
+      total: defaultField,
+    },
+  };
+
+  // Editable fields state
+  const [vendorName, setVendorName] = useState(fields.vendor.name.value);
+  const [vendorAddress, setVendorAddress] = useState(fields.vendor.address.value);
+  const [vendorCity, setVendorCity] = useState(fields.vendor.city.value);
+  const [vendorState, setVendorState] = useState(fields.vendor.state.value);
+  const [vendorZip, setVendorZip] = useState(fields.vendor.zip.value);
+  const [vendorTaxId, setVendorTaxId] = useState(fields.vendor.taxId.value);
+  const [vendorEmail, setVendorEmail] = useState(fields.vendor.email.value);
+  const [vendorPhone, setVendorPhone] = useState(fields.vendor.phone.value);
+
+  const [invoiceNumber, setInvoiceNumber] = useState(fields.invoice.invoiceNumber.value);
+  const [invoiceDate, setInvoiceDate] = useState(fields.invoice.invoiceDate.value);
+  const [dueDate, setDueDate] = useState(fields.invoice.dueDate.value);
+  const [subtotal, setSubtotal] = useState(fields.invoice.subtotal.value);
+  const [tax, setTax] = useState(fields.invoice.tax.value);
+  const [total, setTotal] = useState(fields.invoice.total.value);
 
   useEffect(() => {
-    // Check if we came from the upload page
-    const uploadedInvoice = sessionStorage.getItem('uploadedInvoice');
-    if (!uploadedInvoice) {
+    // Check if we came from the upload page with data
+    if (!invoiceDoc && !location.state) {
       navigate('/upload');
     }
-  }, [navigate]);
+  }, [navigate, invoiceDoc, location.state]);
 
   const handleSave = async () => {
     if (!user || isReadOnly) return;
@@ -159,19 +148,38 @@ export default function ReviewPage() {
         .from('vendors')
         .insert({
           user_id: user.id,
-          name: vendorName,
-          address: vendorAddress,
-          city: vendorCity,
-          state: vendorState,
-          zip: vendorZip,
-          tax_id: vendorTaxId,
-          email: vendorEmail,
-          phone: vendorPhone,
+          name: vendorName || 'Unknown Vendor',
+          address: vendorAddress || null,
+          city: vendorCity || null,
+          state: vendorState || null,
+          zip: vendorZip || null,
+          tax_id: vendorTaxId || null,
+          email: vendorEmail || null,
+          phone: vendorPhone || null,
         })
         .select()
         .single();
 
       if (vendorError) throw vendorError;
+
+      // Parse and format date for database
+      const parseDate = (dateStr: string): string | null => {
+        if (!dateStr) return null;
+        // Try to parse various date formats
+        const date = new Date(dateStr);
+        if (!isNaN(date.getTime())) {
+          return date.toISOString().split('T')[0];
+        }
+        return null;
+      };
+
+      // Parse currency values
+      const parseCurrency = (value: string): number | null => {
+        if (!value) return null;
+        const cleaned = value.replace(/[$,\s]/g, '');
+        const num = parseFloat(cleaned);
+        return isNaN(num) ? null : num;
+      };
 
       // Save invoice
       const { error: invoiceError } = await supabase
@@ -179,19 +187,19 @@ export default function ReviewPage() {
         .insert({
           user_id: user.id,
           vendor_id: vendor.id,
-          invoice_number: invoiceNumber,
-          invoice_date: invoiceDate,
-          due_date: dueDate,
-          subtotal: parseFloat(subtotal.replace(/,/g, '')),
-          tax: parseFloat(tax.replace(/,/g, '')),
-          total: parseFloat(total.replace(/,/g, '')),
+          invoice_number: invoiceNumber || null,
+          invoice_date: parseDate(invoiceDate),
+          due_date: parseDate(dueDate),
+          subtotal: parseCurrency(subtotal),
+          tax: parseCurrency(tax),
+          total: parseCurrency(total),
+          raw_data: invoiceDoc ? { 
+            fullText: invoiceDoc.fullText.substring(0, 10000), 
+            isScanned: invoiceDoc.isScanned 
+          } : null,
         });
 
       if (invoiceError) throw invoiceError;
-
-      // Clear session storage
-      sessionStorage.removeItem('uploadedInvoice');
-      sessionStorage.removeItem('uploadedW9');
 
       toast.success('Records saved successfully!');
       navigate('/records');
@@ -202,6 +210,8 @@ export default function ReviewPage() {
       setIsSaving(false);
     }
   };
+
+  const isScanned = invoiceDoc?.isScanned || w9Doc?.isScanned;
 
   return (
     <AppLayout>
@@ -219,6 +229,42 @@ export default function ReviewPage() {
           </div>
         </div>
 
+        {/* Scanned Document Warning */}
+        {isScanned && (
+          <div className="flex items-start gap-3 p-4 bg-warning/10 border border-warning/30 rounded-lg animate-scale-in">
+            <FileWarning className="h-5 w-5 text-warning flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-medium text-warning">Scanned Document Detected</p>
+              <p className="text-sm text-muted-foreground">
+                One or more documents appear to be scanned images without selectable text. 
+                Fields may be empty or inaccurate. Please review and enter data manually.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Document Info */}
+        <div className="flex flex-wrap gap-3">
+          {invoiceDoc && (
+            <div className="flex items-center gap-2 px-3 py-2 bg-muted rounded-lg text-sm">
+              <FileText className="h-4 w-4 text-primary" />
+              <span>{invoiceDoc.fileName}</span>
+              {invoiceDoc.isScanned && (
+                <span className="text-xs bg-warning/20 text-warning px-2 py-0.5 rounded">Scanned</span>
+              )}
+            </div>
+          )}
+          {w9Doc && (
+            <div className="flex items-center gap-2 px-3 py-2 bg-muted rounded-lg text-sm">
+              <FileText className="h-4 w-4 text-accent" />
+              <span>{w9Doc.fileName}</span>
+              {w9Doc.isScanned && (
+                <span className="text-xs bg-warning/20 text-warning px-2 py-0.5 rounded">Scanned</span>
+              )}
+            </div>
+          )}
+        </div>
+
         <div className="grid lg:grid-cols-2 gap-6">
           {/* Vendor Information */}
           <Card className="animate-slide-up" style={{ animationDelay: '0.1s' }}>
@@ -231,52 +277,52 @@ export default function ReviewPage() {
             <CardContent className="space-y-4">
               <EditableField
                 label="Vendor Name"
-                field={extractedData.vendor.name}
+                field={fields.vendor.name}
                 value={vendorName}
                 onChange={setVendorName}
               />
               <EditableField
                 label="Address"
-                field={extractedData.vendor.address}
+                field={fields.vendor.address}
                 value={vendorAddress}
                 onChange={setVendorAddress}
               />
               <div className="grid grid-cols-3 gap-4">
                 <EditableField
                   label="City"
-                  field={extractedData.vendor.city}
+                  field={fields.vendor.city}
                   value={vendorCity}
                   onChange={setVendorCity}
                 />
                 <EditableField
                   label="State"
-                  field={extractedData.vendor.state}
+                  field={fields.vendor.state}
                   value={vendorState}
                   onChange={setVendorState}
                 />
                 <EditableField
                   label="ZIP"
-                  field={extractedData.vendor.zip}
+                  field={fields.vendor.zip}
                   value={vendorZip}
                   onChange={setVendorZip}
                 />
               </div>
               <EditableField
                 label="Tax ID"
-                field={extractedData.vendor.taxId}
+                field={fields.vendor.taxId}
                 value={vendorTaxId}
                 onChange={setVendorTaxId}
               />
               <div className="grid grid-cols-2 gap-4">
                 <EditableField
                   label="Email"
-                  field={extractedData.vendor.email}
+                  field={fields.vendor.email}
                   value={vendorEmail}
                   onChange={setVendorEmail}
                 />
                 <EditableField
                   label="Phone"
-                  field={extractedData.vendor.phone}
+                  field={fields.vendor.phone}
                   value={vendorPhone}
                   onChange={setVendorPhone}
                 />
@@ -295,20 +341,20 @@ export default function ReviewPage() {
             <CardContent className="space-y-4">
               <EditableField
                 label="Invoice Number"
-                field={extractedData.invoice.invoiceNumber}
+                field={fields.invoice.invoiceNumber}
                 value={invoiceNumber}
                 onChange={setInvoiceNumber}
               />
               <div className="grid grid-cols-2 gap-4">
                 <EditableField
                   label="Invoice Date"
-                  field={extractedData.invoice.invoiceDate}
+                  field={fields.invoice.invoiceDate}
                   value={invoiceDate}
                   onChange={setInvoiceDate}
                 />
                 <EditableField
                   label="Due Date"
-                  field={extractedData.invoice.dueDate}
+                  field={fields.invoice.dueDate}
                   value={dueDate}
                   onChange={setDueDate}
                 />
@@ -320,22 +366,24 @@ export default function ReviewPage() {
                 <div className="flex items-center justify-between">
                   <Label>Subtotal</Label>
                   <div className="flex items-center gap-2">
-                    <ConfidenceBadge confidence={extractedData.invoice.subtotal.confidence} />
+                    <ConfidenceBadge confidence={fields.invoice.subtotal.confidence} />
                     <Input 
                       value={subtotal} 
                       onChange={(e) => setSubtotal(e.target.value)}
                       className="w-32 text-right"
+                      placeholder="0.00"
                     />
                   </div>
                 </div>
                 <div className="flex items-center justify-between">
                   <Label>Tax</Label>
                   <div className="flex items-center gap-2">
-                    <ConfidenceBadge confidence={extractedData.invoice.tax.confidence} />
+                    <ConfidenceBadge confidence={fields.invoice.tax.confidence} />
                     <Input 
                       value={tax} 
                       onChange={(e) => setTax(e.target.value)}
                       className="w-32 text-right"
+                      placeholder="0.00"
                     />
                   </div>
                 </div>
@@ -343,11 +391,12 @@ export default function ReviewPage() {
                 <div className="flex items-center justify-between">
                   <Label className="text-lg font-semibold">Total</Label>
                   <div className="flex items-center gap-2">
-                    <ConfidenceBadge confidence={extractedData.invoice.total.confidence} />
+                    <ConfidenceBadge confidence={fields.invoice.total.confidence} />
                     <Input 
                       value={total} 
                       onChange={(e) => setTotal(e.target.value)}
                       className="w-32 text-right font-semibold"
+                      placeholder="0.00"
                     />
                   </div>
                 </div>
