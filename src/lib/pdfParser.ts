@@ -1,8 +1,8 @@
 import * as pdfjsLib from 'pdfjs-dist';
-import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import workerSrc from 'pdfjs-dist/build/pdf.worker.min.js?url';
 
-// Configure PDF.js worker using the bundled version
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
+// Configure PDF.js worker using the bundled version (no CDN)
+pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
 
 export interface ParsedPage {
   pageNumber: number;
