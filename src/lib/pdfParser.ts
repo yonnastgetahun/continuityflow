@@ -8,6 +8,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
 export interface ParsedPage {
   pageNumber: number;
   text: string;
+  lineCount: number;
 }
 
 export interface ParsedDocument {
@@ -57,10 +58,12 @@ interface ExtractionCandidate {
   value: string;
   pageNumber: number;
   snippet: string;
+  lineIndex: number; // Line position in document (for position-based scoring)
   labelMatchStrength: number; // 0-1: how well the label matches
   proximityScore: number; // 0-1: how close to keyword
   formatScore: number; // 0-1: how well it matches expected format
   uniquenessScore: number; // 0-1: how unique this match is
+  positionScore: number; // 0-1: position-based scoring (top/bottom preference)
 }
 
 interface PatternConfig {
@@ -68,27 +71,54 @@ interface PatternConfig {
   labelKeywords: string[];
   formatValidator?: (value: string) => number;
   labelMatchWeight?: number;
+  preferPosition?: 'top' | 'bottom'; // Position preference for this field
+  excludePatterns?: RegExp[]; // Patterns to exclude from matches
 }
+
+// Placeholder/label patterns to exclude from vendor name extraction
+const VENDOR_EXCLUDE_PATTERNS = [
+  /customer\s*name/i,
+  /bill\s*to/i,
+  /ship\s*to/i,
+  /street/i,
+  /postcode/i,
+  /country/i,
+  /city/i,
+  /state/i,
+  /zip/i,
+  /phone/i,
+  /email/i,
+  /date/i,
+  /invoice/i,
+  /total/i,
+  /amount/i,
+  /payment/i,
+];
 
 // Format validators return 0-1 score
 const formatValidators = {
   date: (value: string): number => {
     // Check various date formats
     const datePatterns = [
-      /^\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}$/,
-      /^[A-Za-z]+\s+\d{1,2},?\s+\d{4}$/,
-      /^\d{4}-\d{2}-\d{2}$/,
+      /^\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}$/, // MM/DD/YYYY, DD-MM-YYYY
+      /^[A-Za-z]+\s+\d{1,2},?\s+\d{4}$/, // Nov 26, 2016
+      /^\d{4}-\d{2}-\d{2}$/, // 2016-11-26 (ISO)
+      /^[A-Za-z]+\s+\d{1,2}(st|nd|rd|th)?,?\s+\d{4}$/i, // November 26th, 2016
     ];
     for (const pattern of datePatterns) {
-      if (pattern.test(value)) return 1;
+      if (pattern.test(value.trim())) return 1;
     }
-    return 0.3;
+    // Partial match if it contains date-like components
+    if (/\d{1,4}[\/.-]\d{1,2}/.test(value)) return 0.5;
+    return 0.2;
   },
   
   currency: (value: string): number => {
-    const cleaned = value.replace(/[$,\s]/g, '');
+    // Allow currency symbols and codes
+    const cleaned = value.replace(/[$€£¥,\s]|USD|EUR|GBP/gi, '').trim();
     if (/^\d+\.?\d{0,2}$/.test(cleaned)) return 1;
-    if (/^\d+$/.test(cleaned)) return 0.8;
+    if (/^\d+$/.test(cleaned)) return 0.9;
+    if (/^\d{1,3}(,\d{3})*(\.\d{2})?$/.test(cleaned)) return 1; // 1,234.56
     return 0.2;
   },
   
@@ -123,14 +153,26 @@ const formatValidators = {
   },
   
   invoiceNumber: (value: string): number => {
-    if (/^[A-Za-z]{0,3}\d{3,}[A-Za-z0-9-]*$/.test(value)) return 1;
-    if (/^\d+$/.test(value)) return 0.9;
-    if (/^[A-Za-z0-9-]+$/.test(value)) return 0.7;
+    // Common invoice number formats
+    if (/^INV[-#]?\d+$/i.test(value)) return 1;
+    if (/^[A-Za-z]{0,3}[-#]?\d{3,}[A-Za-z0-9-]*$/.test(value)) return 1;
+    if (/^\d{4,}$/.test(value)) return 0.9;
+    if (/^[A-Za-z0-9-]+$/.test(value) && value.length >= 3) return 0.7;
+    return 0.4;
+  },
+  
+  companyName: (value: string): number => {
+    // Boost score for company indicators
+    const companyIndicators = /\b(Inc\.?|LLC|Ltd\.?|Corp\.?|Company|Co\.?|Corporation|Incorporated|Limited|Pty|GmbH|S\.?A\.?|PLC)\b/i;
+    if (companyIndicators.test(value)) return 1;
+    // Reasonable length company name
+    if (value.length >= 3 && value.length <= 60 && /^[A-Z]/.test(value)) return 0.7;
     return 0.4;
   },
 };
 
 function calculateLabelMatchStrength(text: string, keywords: string[], matchIndex: number): number {
+  // Search in a window before the match
   const searchWindow = text.substring(Math.max(0, matchIndex - 100), matchIndex).toLowerCase();
   
   let maxScore = 0;
@@ -139,8 +181,11 @@ function calculateLabelMatchStrength(text: string, keywords: string[], matchInde
     const keywordIndex = searchWindow.lastIndexOf(keywordLower);
     if (keywordIndex !== -1) {
       const distance = searchWindow.length - keywordIndex - keywordLower.length;
+      // Closer = higher score, with bonus for very close proximity (same line)
       const proximityScore = Math.max(0, 1 - distance / 50);
-      maxScore = Math.max(maxScore, proximityScore);
+      // Bonus for exact label matches like "Invoice Number:"
+      const exactLabelBonus = searchWindow.includes(keywordLower + ':') ? 0.2 : 0;
+      maxScore = Math.max(maxScore, Math.min(1, proximityScore + exactLabelBonus));
     }
   }
   
@@ -158,13 +203,22 @@ function extractSnippet(text: string, matchIndex: number, matchLength: number): 
   return snippet.replace(/\s+/g, ' ').trim();
 }
 
+function getLineIndex(text: string, matchIndex: number): number {
+  const textBefore = text.substring(0, matchIndex);
+  return textBefore.split(/\n/).length;
+}
+
 function findAllCandidates(
   pages: ParsedPage[],
   docType: 'invoice' | 'w9',
-  patterns: PatternConfig[]
+  patterns: PatternConfig[],
+  totalLines?: number
 ): ExtractionCandidate[] {
   const candidates: ExtractionCandidate[] = [];
   const allMatches: string[] = [];
+  
+  // Calculate total lines for position scoring
+  const computedTotalLines = totalLines || pages.reduce((sum, p) => sum + p.lineCount, 0);
   
   // First pass: collect all matches for uniqueness scoring
   for (const page of pages) {
@@ -175,6 +229,9 @@ function findAllCandidates(
       }
     }
   }
+  
+  // Track cumulative lines for position scoring
+  let cumulativeLines = 0;
   
   // Second pass: extract candidates with scores
   for (const page of pages) {
@@ -188,7 +245,18 @@ function findAllCandidates(
         const value = match[1].trim();
         if (!value) continue;
         
+        // Check exclusion patterns
+        if (config.excludePatterns) {
+          const matchContext = page.text.substring(
+            Math.max(0, match.index - 50),
+            Math.min(page.text.length, match.index + match[0].length + 50)
+          );
+          const isExcluded = config.excludePatterns.some(p => p.test(matchContext));
+          if (isExcluded) continue;
+        }
+        
         const matchIndex = match.index;
+        const lineIndex = cumulativeLines + getLineIndex(page.text, matchIndex);
         
         // Calculate label match strength
         const labelMatchStrength = calculateLabelMatchStrength(
@@ -209,17 +277,30 @@ function findAllCandidates(
         // Proximity score is factored into label match
         const proximityScore = labelMatchStrength > 0 ? 1 : 0.3;
         
+        // Position score based on preference
+        let positionScore = 0.5;
+        if (config.preferPosition === 'top' && computedTotalLines > 0) {
+          // Higher score for earlier lines (first 15 lines get max score)
+          positionScore = Math.max(0, 1 - (lineIndex / 15));
+        } else if (config.preferPosition === 'bottom' && computedTotalLines > 0) {
+          // Higher score for later lines
+          positionScore = Math.min(1, lineIndex / computedTotalLines);
+        }
+        
         candidates.push({
           value,
           pageNumber: page.pageNumber,
           snippet: extractSnippet(page.text, matchIndex, match[0].length),
+          lineIndex,
           labelMatchStrength,
           proximityScore,
           formatScore,
           uniquenessScore,
+          positionScore,
         });
       }
     }
+    cumulativeLines += page.lineCount;
   }
   
   return candidates;
@@ -227,7 +308,8 @@ function findAllCandidates(
 
 function selectBestCandidate(
   candidates: ExtractionCandidate[],
-  docType: 'invoice' | 'w9'
+  docType: 'invoice' | 'w9',
+  usePositionScore: boolean = false
 ): { value: string; confidence: 'high' | 'medium' | 'low'; evidence: FieldEvidence } {
   if (candidates.length === 0) {
     return {
@@ -237,13 +319,23 @@ function selectBestCandidate(
     };
   }
   
-  // Score each candidate
+  // Score each candidate with adjusted weights
   const scoredCandidates = candidates.map(c => {
-    const score = 
-      c.labelMatchStrength * 0.35 +
-      c.formatScore * 0.30 +
-      c.uniquenessScore * 0.20 +
-      c.proximityScore * 0.15;
+    let score: number;
+    if (usePositionScore) {
+      score = 
+        c.labelMatchStrength * 0.30 +
+        c.formatScore * 0.25 +
+        c.positionScore * 0.25 +
+        c.uniquenessScore * 0.10 +
+        c.proximityScore * 0.10;
+    } else {
+      score = 
+        c.labelMatchStrength * 0.40 +
+        c.formatScore * 0.30 +
+        c.uniquenessScore * 0.15 +
+        c.proximityScore * 0.15;
+    }
     return { ...c, totalScore: score };
   });
   
@@ -252,9 +344,13 @@ function selectBestCandidate(
   
   const best = scoredCandidates[0];
   
-  // Determine confidence level
+  // Determine confidence level based on combined scoring
   let confidence: 'high' | 'medium' | 'low';
-  if (best.totalScore >= 0.7) {
+  
+  // High confidence: strong label match + valid format
+  if (best.labelMatchStrength >= 0.6 && best.formatScore >= 0.8) {
+    confidence = 'high';
+  } else if (best.totalScore >= 0.65) {
     confidence = 'high';
   } else if (best.totalScore >= 0.4) {
     confidence = 'medium';
@@ -271,6 +367,83 @@ function selectBestCandidate(
       snippet: best.snippet,
     },
   };
+}
+
+// Extract vendor name from top of document
+function extractVendorName(
+  pages: ParsedPage[],
+  docType: 'invoice' | 'w9'
+): ExtractedField {
+  const candidates: ExtractionCandidate[] = [];
+  
+  // Focus on first page, first 15 lines
+  const firstPage = pages[0];
+  if (!firstPage) {
+    return {
+      value: '',
+      confidence: 'low',
+      evidence: { docType, pageNumber: 0, snippet: 'No text found' },
+    };
+  }
+  
+  const lines = firstPage.text.split(/(?:\s{2,}|\n)/);
+  const topLines = lines.slice(0, 15);
+  
+  for (let i = 0; i < topLines.length; i++) {
+    const line = topLines[i].trim();
+    if (!line || line.length < 2) continue;
+    
+    // Skip lines that look like labels/headers
+    const isExcluded = VENDOR_EXCLUDE_PATTERNS.some(p => p.test(line));
+    if (isExcluded) continue;
+    
+    // Skip lines that are just numbers or dates
+    if (/^\d+$/.test(line) || /^\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}$/.test(line)) continue;
+    
+    // Score the line
+    const hasCompanyIndicator = /\b(Inc\.?|LLC|Ltd\.?|Corp\.?|Company|Co\.?|Corporation|Incorporated|Limited|Pty|GmbH|S\.?A\.?|PLC)\b/i.test(line);
+    const isBeforeInvoice = i < topLines.findIndex(l => /invoice/i.test(l)) || !topLines.some(l => /invoice/i.test(l));
+    
+    const formatScore = formatValidators.companyName(line);
+    const positionScore = Math.max(0, 1 - (i / 15)); // Earlier = better
+    const labelMatchStrength = hasCompanyIndicator ? 0.8 : (isBeforeInvoice && i < 5 ? 0.5 : 0.3);
+    
+    candidates.push({
+      value: line,
+      pageNumber: 1,
+      snippet: line,
+      lineIndex: i,
+      labelMatchStrength,
+      proximityScore: 0.5,
+      formatScore,
+      uniquenessScore: 0.8,
+      positionScore,
+    });
+  }
+  
+  // Also try pattern-based extraction
+  const patternCandidates = findAllCandidates(
+    [{ ...firstPage, lineCount: topLines.length }],
+    docType,
+    [
+      {
+        pattern: /(?:Name|Business Name|Company|Legal Name)[:\s]*([A-Za-z0-9\s&.,'-]{2,50})/i,
+        labelKeywords: ['name', 'business name', 'company', 'legal name'],
+        formatValidator: formatValidators.companyName,
+        preferPosition: 'top',
+      },
+      {
+        pattern: /^([A-Z][A-Za-z0-9\s&.,'-]+(?:Inc\.?|LLC|Corp\.?|Company|Co\.?|Ltd\.?|Pty))\b/m,
+        labelKeywords: [],
+        formatValidator: formatValidators.companyName,
+        preferPosition: 'top',
+      },
+    ],
+    topLines.length
+  );
+  
+  const allCandidates = [...candidates, ...patternCandidates];
+  return selectBestCandidate(allCandidates, docType, true);
 }
 
 export async function parsePDF(
@@ -294,9 +467,13 @@ export async function parsePDF(
         .replace(/\s+/g, ' ')
         .trim();
       
+      // Estimate line count from text length and spacing
+      const lineCount = Math.max(1, Math.ceil(pageText.length / 80));
+      
       pages.push({
         pageNumber: pageNum,
         text: pageText,
+        lineCount,
       });
       
       fullText += (pageNum > 1 ? '\n\n' : '') + pageText;
@@ -328,18 +505,12 @@ export function extractFieldsFromText(
   const vendorPages = w9Pages.length > 0 ? w9Pages : invoicePages;
   const vendorDocType = w9Doc ? 'w9' : 'invoice';
 
+  // Calculate total lines for position-based scoring
+  const totalInvoiceLines = invoicePages.reduce((sum, p) => sum + p.lineCount, 0);
+
   return {
     vendor: {
-      name: extractField(vendorPages, vendorDocType, [
-        {
-          pattern: /(?:Name|Business Name|Company|Legal Name)[:\s]*([A-Za-z0-9\s&.,'-]{2,50})/i,
-          labelKeywords: ['name', 'business name', 'company', 'legal name'],
-        },
-        {
-          pattern: /^([A-Z][A-Za-z0-9\s&.,'-]+(?:Inc\.?|LLC|Corp\.?|Company|Co\.?))/m,
-          labelKeywords: ['inc', 'llc', 'corp', 'company'],
-        },
-      ]),
+      name: extractVendorName(vendorPages, vendorDocType),
       
       address: extractField(vendorPages, vendorDocType, [
         {
@@ -394,8 +565,8 @@ export function extractFieldsFromText(
         w9Doc ? 'w9' : 'invoice',
         [
           {
-            pattern: /(?:TIN|Tax ID|EIN|SSN|Taxpayer)[:\s#]*(\d{2}-?\d{7})/i,
-            labelKeywords: ['tin', 'tax id', 'ein', 'ssn', 'taxpayer'],
+            pattern: /(?:TIN|Tax ID|EIN|SSN|Taxpayer|Federal Tax)[:\s#]*(\d{2}-?\d{7})/i,
+            labelKeywords: ['tin', 'tax id', 'ein', 'ssn', 'taxpayer', 'federal tax'],
             formatValidator: formatValidators.taxId,
           },
           {
@@ -429,10 +600,16 @@ export function extractFieldsFromText(
     },
     
     invoice: {
+      // Invoice Number - prefer label-proximate patterns
       invoiceNumber: extractField(invoicePages, 'invoice', [
         {
-          pattern: /(?:Invoice|Inv)[#:\s]*([A-Za-z0-9-]+)/i,
-          labelKeywords: ['invoice', 'inv', 'invoice number', 'invoice #'],
+          pattern: /(?:Invoice\s*(?:Number|#|No\.?))[:\s]*([A-Za-z0-9-]+)/i,
+          labelKeywords: ['invoice number', 'invoice #', 'invoice no', 'inv #', 'inv no'],
+          formatValidator: formatValidators.invoiceNumber,
+        },
+        {
+          pattern: /(?:Invoice)[#:\s]*([A-Za-z0-9-]{3,20})/i,
+          labelKeywords: ['invoice'],
           formatValidator: formatValidators.invoiceNumber,
         },
         {
@@ -442,23 +619,34 @@ export function extractFieldsFromText(
         },
       ]),
       
+      // Invoice Date - parse multiple formats
       invoiceDate: extractField(invoicePages, 'invoice', [
         {
-          pattern: /(?:Invoice Date|Date)[:\s]*(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})/i,
-          labelKeywords: ['invoice date', 'date', 'issued'],
+          pattern: /(?:Invoice\s*Date|Date\s*of\s*Invoice)[:\s]*(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})/i,
+          labelKeywords: ['invoice date', 'date of invoice'],
           formatValidator: formatValidators.date,
         },
         {
-          pattern: /(?:Date)[:\s]*([A-Za-z]+\s+\d{1,2},?\s+\d{4})/i,
+          pattern: /(?:Invoice\s*Date|Date)[:\s]*([A-Za-z]+\s+\d{1,2},?\s+\d{4})/i,
+          labelKeywords: ['invoice date', 'date'],
+          formatValidator: formatValidators.date,
+        },
+        {
+          pattern: /(?:Date)[:\s]*(\d{4}-\d{2}-\d{2})/i,
           labelKeywords: ['date'],
+          formatValidator: formatValidators.date,
+        },
+        {
+          pattern: /(?:Date)[:\s]*(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})/i,
+          labelKeywords: ['date', 'issued'],
           formatValidator: formatValidators.date,
         },
       ]),
       
       dueDate: extractField(invoicePages, 'invoice', [
         {
-          pattern: /(?:Due Date|Payment Due|Due)[:\s]*(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})/i,
-          labelKeywords: ['due date', 'payment due', 'due', 'pay by'],
+          pattern: /(?:Due\s*Date|Payment\s*Due|Due\s*By)[:\s]*(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})/i,
+          labelKeywords: ['due date', 'payment due', 'due by', 'pay by'],
           formatValidator: formatValidators.date,
         },
         {
@@ -478,26 +666,48 @@ export function extractFieldsFromText(
       
       tax: extractField(invoicePages, 'invoice', [
         {
-          pattern: /(?:Tax|Sales Tax|VAT)[:\s$]*([0-9,]+\.?\d*)/i,
+          pattern: /(?:Tax|Sales Tax|VAT|GST)[:\s$]*([0-9,]+\.?\d*)/i,
           labelKeywords: ['tax', 'sales tax', 'vat', 'gst'],
           formatValidator: formatValidators.currency,
         },
       ]),
       
-      total: extractField(invoicePages, 'invoice', [
-        {
-          pattern: /(?:Total|Amount Due|Balance Due|Grand Total)[:\s$]*([0-9,]+\.?\d*)/i,
-          labelKeywords: ['total', 'amount due', 'balance due', 'grand total', 'total due'],
-          formatValidator: formatValidators.currency,
-        },
-        {
-          pattern: /\$\s*([0-9,]+\.\d{2})\s*$/m,
-          labelKeywords: ['$'],
-          formatValidator: formatValidators.currency,
-        },
-      ]),
+      // Total - prefer bottom of page, strong label match
+      total: extractTotalField(invoicePages, totalInvoiceLines),
     },
   };
+}
+
+// Special extraction for total amount with position-based scoring
+function extractTotalField(pages: ParsedPage[], totalLines: number): ExtractedField {
+  const candidates = findAllCandidates(
+    pages,
+    'invoice',
+    [
+      {
+        pattern: /(?:Total\s*Due|Amount\s*Due|Balance\s*Due|Grand\s*Total)[:\s$]*([0-9,]+\.?\d{0,2})/i,
+        labelKeywords: ['total due', 'amount due', 'balance due', 'grand total'],
+        formatValidator: formatValidators.currency,
+        preferPosition: 'bottom',
+      },
+      {
+        pattern: /(?:Total)[:\s$]*([0-9,]+\.\d{2})/i,
+        labelKeywords: ['total'],
+        formatValidator: formatValidators.currency,
+        preferPosition: 'bottom',
+      },
+      {
+        pattern: /\$\s*([0-9,]+\.\d{2})\s*$/m,
+        labelKeywords: [],
+        formatValidator: formatValidators.currency,
+        preferPosition: 'bottom',
+      },
+    ],
+    totalLines
+  );
+  
+  // If multiple totals exist, prefer the one with strongest label + bottom position
+  return selectBestCandidate(candidates, 'invoice', true);
 }
 
 function extractField(
@@ -505,6 +715,8 @@ function extractField(
   docType: 'invoice' | 'w9',
   patterns: PatternConfig[]
 ): ExtractedField {
-  const candidates = findAllCandidates(pages, docType, patterns);
-  return selectBestCandidate(candidates, docType);
+  const totalLines = pages.reduce((sum, p) => sum + p.lineCount, 0);
+  const candidates = findAllCandidates(pages, docType, patterns, totalLines);
+  const hasPositionPreference = patterns.some(p => p.preferPosition);
+  return selectBestCandidate(candidates, docType, hasPositionPreference);
 }
