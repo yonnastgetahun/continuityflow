@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { 
   FileText, 
   Check, 
@@ -24,7 +25,8 @@ import {
   PanelLeft,
   UserCheck,
   CircleDot,
-  ScanLine
+  ScanLine,
+  ChevronDown
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -171,6 +173,7 @@ export default function ReviewPage() {
   const [viewerPage, setViewerPage] = useState(1);
   const [highlightSnippet, setHighlightSnippet] = useState<string | undefined>();
   const [confirmedFields, setConfirmedFields] = useState<ConfirmedFields>({});
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const { invoiceDoc, w9Doc, extractedFields, invoiceFile, w9File, debugInfo } = (location.state || {}) as {
     invoiceDoc?: ParsedDocument;
@@ -260,11 +263,13 @@ export default function ReviewPage() {
 
   const handleFieldChange = (fieldKey: FieldKey, value: string, setter: (v: string) => void) => {
     setter(value);
+    // When user edits, mark as confirmed (they've reviewed it)
     if (!confirmedFields[fieldKey]) {
       setConfirmedFields(prev => ({ ...prev, [fieldKey]: true }));
     }
   };
 
+  // Required fields: Vendor Name, Invoice Date, Total
   const requiredFieldsStatus = useMemo(() => {
     const vendorNameValid = vendorName.trim().length > 0 && confirmedFields.vendorName;
     const invoiceDateValid = (invoiceDate.trim().length > 0 || invoiceDate.toLowerCase() === 'unknown') && confirmedFields.invoiceDate;
@@ -278,12 +283,13 @@ export default function ReviewPage() {
     };
   }, [vendorName, invoiceDate, total, confirmedFields]);
 
-  // Auto-confirm fields that have high confidence extracted values (only for non-scanned docs)
+  // Auto-confirm high confidence required fields with valid values (reduces manual clicks)
   useEffect(() => {
     if (isScanned) return; // Don't auto-confirm for scanned documents
     
     const autoConfirm: ConfirmedFields = {};
     
+    // Auto-confirm required fields if they have high confidence and a value
     if (baseFields.vendor.name.confidence === 'high' && baseFields.vendor.name.value) {
       autoConfirm.vendorName = true;
     }
@@ -292,6 +298,11 @@ export default function ReviewPage() {
     }
     if (baseFields.invoice.total.confidence === 'high' && baseFields.invoice.total.value) {
       autoConfirm.total = true;
+    }
+    
+    // Also auto-confirm non-required fields with high confidence
+    if (baseFields.invoice.invoiceNumber.confidence === 'high' && baseFields.invoice.invoiceNumber.value) {
+      autoConfirm.invoiceNumber = true;
     }
     
     if (Object.keys(autoConfirm).length > 0) {
@@ -497,16 +508,18 @@ export default function ReviewPage() {
 
           {/* Form Panel */}
           <div className="flex-1 overflow-y-auto space-y-4 pr-2">
-            <div className="grid lg:grid-cols-2 gap-4">
-              {/* Vendor Information */}
-              <Card>
-                <CardHeader className="py-3 px-4">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Building2 className="h-4 w-4 text-primary" />
-                    Vendor Information
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3 px-4 pb-4">
+            {/* Essential Fields Card */}
+            <Card>
+              <CardHeader className="py-3 px-4">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Receipt className="h-4 w-4 text-primary" />
+                  Essential Information
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4 px-4 pb-4">
+                {/* MVP Fields Grid */}
+                <div className="grid sm:grid-cols-2 gap-4">
+                  {/* Vendor Name */}
                   <EditableField
                     label="Vendor Name"
                     field={fields.vendor.name}
@@ -516,78 +529,8 @@ export default function ReviewPage() {
                     isConfirmed={!!confirmedFields.vendorName}
                     isRequired
                   />
-                  <EditableField
-                    label="Address"
-                    field={fields.vendor.address}
-                    value={vendorAddress}
-                    onChange={(v) => handleFieldChange('vendorAddress', v, setVendorAddress)}
-                    onJumpToSource={handleJumpToSource}
-                    isConfirmed={!!confirmedFields.vendorAddress}
-                  />
-                  <div className="grid grid-cols-3 gap-2">
-                    <EditableField
-                      label="City"
-                      field={fields.vendor.city}
-                      value={vendorCity}
-                      onChange={(v) => handleFieldChange('vendorCity', v, setVendorCity)}
-                      onJumpToSource={handleJumpToSource}
-                      isConfirmed={!!confirmedFields.vendorCity}
-                    />
-                    <EditableField
-                      label="State"
-                      field={fields.vendor.state}
-                      value={vendorState}
-                      onChange={(v) => handleFieldChange('vendorState', v, setVendorState)}
-                      onJumpToSource={handleJumpToSource}
-                      isConfirmed={!!confirmedFields.vendorState}
-                    />
-                    <EditableField
-                      label="ZIP"
-                      field={fields.vendor.zip}
-                      value={vendorZip}
-                      onChange={(v) => handleFieldChange('vendorZip', v, setVendorZip)}
-                      onJumpToSource={handleJumpToSource}
-                      isConfirmed={!!confirmedFields.vendorZip}
-                    />
-                  </div>
-                  <EditableField
-                    label="Tax ID"
-                    field={fields.vendor.taxId}
-                    value={vendorTaxId}
-                    onChange={(v) => handleFieldChange('vendorTaxId', v, setVendorTaxId)}
-                    onJumpToSource={handleJumpToSource}
-                    isConfirmed={!!confirmedFields.vendorTaxId}
-                  />
-                  <div className="grid grid-cols-2 gap-2">
-                    <EditableField
-                      label="Email"
-                      field={fields.vendor.email}
-                      value={vendorEmail}
-                      onChange={(v) => handleFieldChange('vendorEmail', v, setVendorEmail)}
-                      onJumpToSource={handleJumpToSource}
-                      isConfirmed={!!confirmedFields.vendorEmail}
-                    />
-                    <EditableField
-                      label="Phone"
-                      field={fields.vendor.phone}
-                      value={vendorPhone}
-                      onChange={(v) => handleFieldChange('vendorPhone', v, setVendorPhone)}
-                      onJumpToSource={handleJumpToSource}
-                      isConfirmed={!!confirmedFields.vendorPhone}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Invoice Information */}
-              <Card>
-                <CardHeader className="py-3 px-4">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Receipt className="h-4 w-4 text-accent" />
-                    Invoice Details
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3 px-4 pb-4">
+                  
+                  {/* Invoice Number */}
                   <EditableField
                     label="Invoice Number"
                     field={fields.invoice.invoiceNumber}
@@ -596,56 +539,22 @@ export default function ReviewPage() {
                     onJumpToSource={handleJumpToSource}
                     isConfirmed={!!confirmedFields.invoiceNumber}
                   />
-                  <div className="grid grid-cols-2 gap-2">
-                    <EditableField
-                      label="Invoice Date"
-                      field={fields.invoice.invoiceDate}
-                      value={invoiceDate}
-                      onChange={(v) => handleFieldChange('invoiceDate', v, setInvoiceDate)}
-                      onJumpToSource={handleJumpToSource}
-                      isConfirmed={!!confirmedFields.invoiceDate}
-                      isRequired
-                    />
-                    <EditableField
-                      label="Due Date"
-                      field={fields.invoice.dueDate}
-                      value={dueDate}
-                      onChange={(v) => handleFieldChange('dueDate', v, setDueDate)}
-                      onJumpToSource={handleJumpToSource}
-                      isConfirmed={!!confirmedFields.dueDate}
-                    />
-                  </div>
-
-                  <Separator className="my-2" />
-
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <Label className="text-sm">Subtotal</Label>
-                      <div className="flex items-center gap-1">
-                        <ConfidenceBadge confidence={fields.invoice.subtotal.confidence} isConfirmed={!!confirmedFields.subtotal} />
-                        <JumpToSourceButton evidence={fields.invoice.subtotal.evidence} onJump={handleJumpToSource} />
-                        <Input 
-                          value={subtotal} 
-                          onChange={(e) => handleFieldChange('subtotal', e.target.value, setSubtotal)}
-                          className="w-28 text-right h-9"
-                          placeholder="0.00"
-                        />
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between gap-2">
-                      <Label className="text-sm">Tax</Label>
-                      <div className="flex items-center gap-1">
-                        <ConfidenceBadge confidence={fields.invoice.tax.confidence} isConfirmed={!!confirmedFields.tax} />
-                        <JumpToSourceButton evidence={fields.invoice.tax.evidence} onJump={handleJumpToSource} />
-                        <Input 
-                          value={tax} 
-                          onChange={(e) => handleFieldChange('tax', e.target.value, setTax)}
-                          className="w-28 text-right h-9"
-                          placeholder="0.00"
-                        />
-                      </div>
-                    </div>
-                    <Separator className="my-2" />
+                </div>
+                
+                <div className="grid sm:grid-cols-2 gap-4">
+                  {/* Invoice Date */}
+                  <EditableField
+                    label="Invoice Date"
+                    field={fields.invoice.invoiceDate}
+                    value={invoiceDate}
+                    onChange={(v) => handleFieldChange('invoiceDate', v, setInvoiceDate)}
+                    onJumpToSource={handleJumpToSource}
+                    isConfirmed={!!confirmedFields.invoiceDate}
+                    isRequired
+                  />
+                  
+                  {/* Total */}
+                  <div className="space-y-1.5">
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-1.5">
                         <Label className="text-sm font-semibold">Total</Label>
@@ -658,18 +567,152 @@ export default function ReviewPage() {
                       <div className="flex items-center gap-1">
                         <ConfidenceBadge confidence={fields.invoice.total.confidence} isConfirmed={!!confirmedFields.total} />
                         <JumpToSourceButton evidence={fields.invoice.total.evidence} onJump={handleJumpToSource} />
-                        <Input 
-                          value={total} 
-                          onChange={(e) => handleFieldChange('total', e.target.value, setTotal)}
-                          className={`w-28 text-right h-9 font-semibold ${!total.trim() ? 'border-destructive/50' : ''}`}
-                          placeholder="0.00"
+                      </div>
+                    </div>
+                    <Input 
+                      value={total} 
+                      onChange={(e) => handleFieldChange('total', e.target.value, setTotal)}
+                      className={`h-9 font-semibold ${!total.trim() ? 'border-destructive/50' : ''}`}
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Advanced Fields Accordion */}
+            <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
+              <Card>
+                <CollapsibleTrigger asChild>
+                  <CardHeader className="py-3 px-4 cursor-pointer hover:bg-muted/30 transition-colors">
+                    <CardTitle className="flex items-center justify-between text-base">
+                      <span className="flex items-center gap-2">
+                        <Building2 className="h-4 w-4 text-muted-foreground" />
+                        Additional Details
+                      </span>
+                      <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
+                    </CardTitle>
+                  </CardHeader>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <CardContent className="space-y-4 px-4 pb-4 pt-0">
+                    <Separator className="mb-4" />
+                    
+                    {/* Vendor Details */}
+                    <div className="space-y-3">
+                      <p className="text-sm font-medium text-muted-foreground">Vendor Details</p>
+                      <EditableField
+                        label="Address"
+                        field={fields.vendor.address}
+                        value={vendorAddress}
+                        onChange={(v) => handleFieldChange('vendorAddress', v, setVendorAddress)}
+                        onJumpToSource={handleJumpToSource}
+                        isConfirmed={!!confirmedFields.vendorAddress}
+                      />
+                      <div className="grid grid-cols-3 gap-2">
+                        <EditableField
+                          label="City"
+                          field={fields.vendor.city}
+                          value={vendorCity}
+                          onChange={(v) => handleFieldChange('vendorCity', v, setVendorCity)}
+                          onJumpToSource={handleJumpToSource}
+                          isConfirmed={!!confirmedFields.vendorCity}
+                        />
+                        <EditableField
+                          label="State"
+                          field={fields.vendor.state}
+                          value={vendorState}
+                          onChange={(v) => handleFieldChange('vendorState', v, setVendorState)}
+                          onJumpToSource={handleJumpToSource}
+                          isConfirmed={!!confirmedFields.vendorState}
+                        />
+                        <EditableField
+                          label="ZIP"
+                          field={fields.vendor.zip}
+                          value={vendorZip}
+                          onChange={(v) => handleFieldChange('vendorZip', v, setVendorZip)}
+                          onJumpToSource={handleJumpToSource}
+                          isConfirmed={!!confirmedFields.vendorZip}
+                        />
+                      </div>
+                      <EditableField
+                        label="Tax ID"
+                        field={fields.vendor.taxId}
+                        value={vendorTaxId}
+                        onChange={(v) => handleFieldChange('vendorTaxId', v, setVendorTaxId)}
+                        onJumpToSource={handleJumpToSource}
+                        isConfirmed={!!confirmedFields.vendorTaxId}
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <EditableField
+                          label="Email"
+                          field={fields.vendor.email}
+                          value={vendorEmail}
+                          onChange={(v) => handleFieldChange('vendorEmail', v, setVendorEmail)}
+                          onJumpToSource={handleJumpToSource}
+                          isConfirmed={!!confirmedFields.vendorEmail}
+                        />
+                        <EditableField
+                          label="Phone"
+                          field={fields.vendor.phone}
+                          value={vendorPhone}
+                          onChange={(v) => handleFieldChange('vendorPhone', v, setVendorPhone)}
+                          onJumpToSource={handleJumpToSource}
+                          isConfirmed={!!confirmedFields.vendorPhone}
                         />
                       </div>
                     </div>
-                  </div>
-                </CardContent>
+
+                    <Separator />
+
+                    {/* Invoice Details */}
+                    <div className="space-y-3">
+                      <p className="text-sm font-medium text-muted-foreground">Invoice Details</p>
+                      <EditableField
+                        label="Due Date"
+                        field={fields.invoice.dueDate}
+                        value={dueDate}
+                        onChange={(v) => handleFieldChange('dueDate', v, setDueDate)}
+                        onJumpToSource={handleJumpToSource}
+                        isConfirmed={!!confirmedFields.dueDate}
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <Label className="text-sm">Subtotal</Label>
+                            <div className="flex items-center gap-1">
+                              <ConfidenceBadge confidence={fields.invoice.subtotal.confidence} isConfirmed={!!confirmedFields.subtotal} />
+                              <JumpToSourceButton evidence={fields.invoice.subtotal.evidence} onJump={handleJumpToSource} />
+                            </div>
+                          </div>
+                          <Input 
+                            value={subtotal} 
+                            onChange={(e) => handleFieldChange('subtotal', e.target.value, setSubtotal)}
+                            className="h-9"
+                            placeholder="0.00"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <Label className="text-sm">Tax</Label>
+                            <div className="flex items-center gap-1">
+                              <ConfidenceBadge confidence={fields.invoice.tax.confidence} isConfirmed={!!confirmedFields.tax} />
+                              <JumpToSourceButton evidence={fields.invoice.tax.evidence} onJump={handleJumpToSource} />
+                            </div>
+                          </div>
+                          <Input 
+                            value={tax} 
+                            onChange={(e) => handleFieldChange('tax', e.target.value, setTax)}
+                            className="h-9"
+                            placeholder="0.00"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </CollapsibleContent>
               </Card>
-            </div>
+            </Collapsible>
 
             {/* Save Button */}
             <div className="flex flex-col items-center gap-2 py-4">
