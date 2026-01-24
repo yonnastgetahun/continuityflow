@@ -169,6 +169,7 @@ export type Database = {
         Row: {
           bill_to: string | null
           created_at: string
+          exported_at: string | null
           id: string
           invoice_id: string | null
           line_items: Json | null
@@ -187,6 +188,7 @@ export type Database = {
         Insert: {
           bill_to?: string | null
           created_at?: string
+          exported_at?: string | null
           id?: string
           invoice_id?: string | null
           line_items?: Json | null
@@ -205,6 +207,7 @@ export type Database = {
         Update: {
           bill_to?: string | null
           created_at?: string
+          exported_at?: string | null
           id?: string
           invoice_id?: string | null
           line_items?: Json | null
