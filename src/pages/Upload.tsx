@@ -123,13 +123,15 @@ export default function UploadPage() {
         warnings.forEach(warning => toast.warning(warning));
       }
 
-      // Navigate to review with extracted data
+      // Navigate to review with extracted data and original files for PDF viewer
       navigate('/review', { 
         state: { 
           invoiceDoc,
           w9Doc,
           extractedFields,
           storeDocuments,
+          invoiceFile: invoiceFile.file,
+          w9File: w9File?.file,
         } 
       });
 
