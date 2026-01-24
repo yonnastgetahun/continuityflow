@@ -14,7 +14,289 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      documents_optin: {
+        Row: {
+          created_at: string
+          document_type: string
+          encrypted: boolean
+          file_path: string
+          id: string
+          related_invoice_id: string | null
+          related_vendor_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          document_type: string
+          encrypted?: boolean
+          file_path: string
+          id?: string
+          related_invoice_id?: string | null
+          related_vendor_id?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          document_type?: string
+          encrypted?: boolean
+          file_path?: string
+          id?: string
+          related_invoice_id?: string | null
+          related_vendor_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documents_optin_related_invoice_id_fkey"
+            columns: ["related_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documents_optin_related_vendor_id_fkey"
+            columns: ["related_vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documents_optin_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoices: {
+        Row: {
+          created_at: string
+          due_date: string | null
+          id: string
+          invoice_date: string | null
+          invoice_number: string | null
+          line_items: Json | null
+          raw_data: Json | null
+          subtotal: number | null
+          tax: number | null
+          total: number | null
+          updated_at: string
+          user_id: string
+          vendor_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          due_date?: string | null
+          id?: string
+          invoice_date?: string | null
+          invoice_number?: string | null
+          line_items?: Json | null
+          raw_data?: Json | null
+          subtotal?: number | null
+          tax?: number | null
+          total?: number | null
+          updated_at?: string
+          user_id: string
+          vendor_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          due_date?: string | null
+          id?: string
+          invoice_date?: string | null
+          invoice_number?: string | null
+          line_items?: Json | null
+          raw_data?: Json | null
+          subtotal?: number | null
+          tax?: number | null
+          total?: number | null
+          updated_at?: string
+          user_id?: string
+          vendor_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          plan_type: Database["public"]["Enums"]["plan_type"] | null
+          subscription_status: Database["public"]["Enums"]["subscription_status"]
+          trial_ends_at: string | null
+          trial_started_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id: string
+          plan_type?: Database["public"]["Enums"]["plan_type"] | null
+          subscription_status?: Database["public"]["Enums"]["subscription_status"]
+          trial_ends_at?: string | null
+          trial_started_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          plan_type?: Database["public"]["Enums"]["plan_type"] | null
+          subscription_status?: Database["public"]["Enums"]["subscription_status"]
+          trial_ends_at?: string | null
+          trial_started_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      purchase_orders: {
+        Row: {
+          bill_to: string | null
+          created_at: string
+          id: string
+          invoice_id: string | null
+          line_items: Json | null
+          notes: string | null
+          po_date: string
+          po_number: string
+          ship_to: string | null
+          status: string | null
+          subtotal: number | null
+          tax: number | null
+          total: number | null
+          updated_at: string
+          user_id: string
+          vendor_id: string | null
+        }
+        Insert: {
+          bill_to?: string | null
+          created_at?: string
+          id?: string
+          invoice_id?: string | null
+          line_items?: Json | null
+          notes?: string | null
+          po_date?: string
+          po_number: string
+          ship_to?: string | null
+          status?: string | null
+          subtotal?: number | null
+          tax?: number | null
+          total?: number | null
+          updated_at?: string
+          user_id: string
+          vendor_id?: string | null
+        }
+        Update: {
+          bill_to?: string | null
+          created_at?: string
+          id?: string
+          invoice_id?: string | null
+          line_items?: Json | null
+          notes?: string | null
+          po_date?: string
+          po_number?: string
+          ship_to?: string | null
+          status?: string | null
+          subtotal?: number | null
+          tax?: number | null
+          total?: number | null
+          updated_at?: string
+          user_id?: string
+          vendor_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_orders_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vendors: {
+        Row: {
+          address: string | null
+          city: string | null
+          created_at: string
+          email: string | null
+          id: string
+          name: string
+          phone: string | null
+          state: string | null
+          tax_id: string | null
+          updated_at: string
+          user_id: string
+          zip: string | null
+        }
+        Insert: {
+          address?: string | null
+          city?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name: string
+          phone?: string | null
+          state?: string | null
+          tax_id?: string | null
+          updated_at?: string
+          user_id: string
+          zip?: string | null
+        }
+        Update: {
+          address?: string | null
+          city?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string
+          phone?: string | null
+          state?: string | null
+          tax_id?: string | null
+          updated_at?: string
+          user_id?: string
+          zip?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendors_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +305,13 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      plan_type: "pilot" | "pro"
+      subscription_status:
+        | "trial_not_started"
+        | "trial_active"
+        | "trial_expiring"
+        | "trial_expired"
+        | "subscribed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +438,15 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      plan_type: ["pilot", "pro"],
+      subscription_status: [
+        "trial_not_started",
+        "trial_active",
+        "trial_expiring",
+        "trial_expired",
+        "subscribed",
+      ],
+    },
   },
 } as const
