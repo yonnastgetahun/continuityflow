@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { FileText, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { z } from 'zod';
+import { getBrandedName, isTestEnvironment } from '@/lib/environment';
 
 const passwordSchema = z.object({
   password: z.string().min(6, 'Password must be at least 6 characters'),
@@ -19,11 +20,17 @@ const passwordSchema = z.object({
 export default function ResetPassword() {
   const { updatePassword, user, loading } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Check if this reset is for a specific environment
+  const envFromUrl = searchParams.get('env') as 'production' | 'test' | null;
+  const isTest = envFromUrl === 'test' || isTestEnvironment();
+  const brandName = getBrandedName();
 
   useEffect(() => {
     // After successful password reset, redirect to upload
@@ -47,17 +54,22 @@ export default function ResetPassword() {
   if (!user) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background px-4">
-        <Link to="/" className="flex items-center gap-2 mb-8">
-          <div className="h-10 w-10 rounded-lg hero-gradient flex items-center justify-center">
-            <FileText className="h-6 w-6 text-primary-foreground" />
+        {isTest && (
+          <div className="mb-4 px-3 py-1.5 rounded-full env-test-badge text-xs font-medium">
+            Test Environment
           </div>
-          <span className="font-display font-bold text-2xl">PO Maker</span>
+        )}
+        <Link to="/" className="flex items-center gap-2 mb-8">
+          <div className="h-8 w-8 rounded bg-primary flex items-center justify-center">
+            <FileText className="h-4 w-4 text-primary-foreground" />
+          </div>
+          <span className="font-semibold text-xl">Continuity</span>
         </Link>
 
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <CardTitle className="font-display text-2xl">Invalid or Expired Link</CardTitle>
-            <CardDescription>
+        <Card className="w-full max-w-md border">
+          <CardHeader className="text-center pb-4">
+            <CardTitle className="text-xl font-semibold">Invalid or Expired Link</CardTitle>
+            <CardDescription className="text-sm">
               This password reset link is invalid or has expired.
             </CardDescription>
           </CardHeader>
@@ -99,23 +111,30 @@ export default function ResetPassword() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background px-4">
-      <Link to="/" className="flex items-center gap-2 mb-8">
-        <div className="h-10 w-10 rounded-lg hero-gradient flex items-center justify-center">
-          <FileText className="h-6 w-6 text-primary-foreground" />
+      {isTest && (
+        <div className="mb-4 px-3 py-1.5 rounded-full env-test-badge text-xs font-medium">
+          Test Environment
         </div>
-        <span className="font-display font-bold text-2xl">PO Maker</span>
+      )}
+      <Link to="/" className="flex items-center gap-2 mb-8">
+        <div className="h-8 w-8 rounded bg-primary flex items-center justify-center">
+          <FileText className="h-4 w-4 text-primary-foreground" />
+        </div>
+        <span className="font-semibold text-xl">Continuity</span>
       </Link>
 
-      <Card className="w-full max-w-md animate-scale-in">
-        <CardHeader className="text-center">
-          <CardTitle className="font-display text-2xl">Set New Password</CardTitle>
-          <CardDescription>Enter your new password below</CardDescription>
+      <Card className="w-full max-w-md animate-fade-in border">
+        <CardHeader className="text-center pb-4">
+          <CardTitle className="text-xl font-semibold">Set New Password</CardTitle>
+          <CardDescription className="text-sm">
+            {isTest ? 'Enter your new password for the test environment' : 'Enter your new password below'}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {success ? (
             <div className="flex flex-col items-center gap-4 py-4">
-              <div className="h-12 w-12 rounded-full bg-green-500/10 flex items-center justify-center">
-                <CheckCircle2 className="h-6 w-6 text-green-600 dark:text-green-400" />
+              <div className="h-12 w-12 rounded-full state-confirmed flex items-center justify-center">
+                <CheckCircle2 className="h-6 w-6 state-confirmed-text" />
               </div>
               <p className="text-center text-muted-foreground">
                 Your password has been updated. Redirecting...

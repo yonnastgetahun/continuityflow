@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-
+import { getEnvironment, type AppEnvironment } from '@/lib/environment';
 interface Profile {
   id: string;
   email: string;
@@ -27,6 +27,7 @@ interface AuthContextType {
   trialDaysLeft: number | null;
   canUseApp: boolean;
   isReadOnly: boolean;
+  environment: AppEnvironment;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -129,19 +130,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const resetPassword = async (email: string) => {
+    const environment = getEnvironment();
     const redirectUrl = `${window.location.origin}/reset-password`;
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: redirectUrl,
-    });
-    return { error: error as Error | null };
+    
+    try {
+      // Use custom edge function for environment-branded emails
+      const { error } = await supabase.functions.invoke('send-password-reset', {
+        body: { email, environment, redirectUrl }
+      });
+      
+      if (error) {
+        return { error: new Error(error.message) };
+      }
+      return { error: null };
+    } catch (err) {
+      // Fallback to standard reset if edge function fails
+      console.warn('Custom reset failed, using standard flow:', err);
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: redirectUrl,
+      });
+      return { error: error as Error | null };
+    }
   };
 
   const updatePassword = async (password: string) => {
     const { error } = await supabase.auth.updateUser({ password });
     return { error: error as Error | null };
   };
-
   const isOwner = isOwnerState;
+  const environment = getEnvironment();
 
   // Calculate trial days left
   const trialDaysLeft = profile?.trial_ends_at
@@ -174,6 +191,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       trialDaysLeft,
       canUseApp,
       isReadOnly,
+      environment,
     }}>
       {children}
     </AuthContext.Provider>

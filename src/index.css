@@ -238,6 +238,13 @@
     color: hsl(var(--destructive));
   }
 
+  /* Environment indicator - test environment badge */
+  .env-test-badge {
+    background: hsl(var(--warning) / 0.08);
+    border: 1px solid hsl(var(--warning) / 0.2);
+    color: hsl(var(--warning));
+  }
+
   /* ========================================
      CONFIDENCE INDICATORS (functional)
      ======================================== */

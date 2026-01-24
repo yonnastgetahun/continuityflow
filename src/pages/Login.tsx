@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { FileText, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { z } from 'zod';
+import { getBrandedName, isTestEnvironment } from '@/lib/environment';
 
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
@@ -112,13 +113,21 @@ export default function Login() {
     }
   };
 
+  const isTest = isTestEnvironment();
+  const brandName = getBrandedName();
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background px-4">
+      {isTest && (
+        <div className="mb-4 px-3 py-1.5 rounded-full env-test-badge text-xs font-medium">
+          Test Environment
+        </div>
+      )}
       <Link to="/" className="flex items-center gap-2 mb-8">
         <div className="h-8 w-8 rounded bg-primary flex items-center justify-center">
           <FileText className="h-4 w-4 text-primary-foreground" />
         </div>
-        <span className="font-semibold text-xl">Continuity</span>
+        <span className="font-semibold text-xl">{isTest ? 'Continuity' : 'Continuity'}</span>
       </Link>
 
       <Card className="w-full max-w-md animate-fade-in border">
