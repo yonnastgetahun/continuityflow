@@ -60,7 +60,9 @@ export default function Login() {
         if (error) {
           setError(error.message);
         } else {
-          setSuccessMessage('Check your email for a password reset link.');
+          setSuccessMessage(
+            `Password reset email sent to ${email}. Check your inbox for a link to reset your password.`
+          );
         }
       } else {
         const validation = loginSchema.safeParse({ email, password });

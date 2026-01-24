@@ -2,6 +2,8 @@ import { ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { TrialBanner } from '@/components/TrialBanner';
+import { TestModeBanner } from '@/components/TestModeBanner';
+import { TestModeToggle } from '@/components/TestModeToggle';
 import { Button } from '@/components/ui/button';
 import { 
   FileText, 
@@ -46,17 +48,23 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
+      <TestModeBanner />
       <TrialBanner />
       
       {/* Top Navigation */}
       <header className="border-b border-border bg-card sticky top-0 z-50">
         <div className="container mx-auto px-4 h-14 flex items-center justify-between">
-          <Link to="/upload" className="flex items-center gap-2">
-            <div className="h-7 w-7 rounded bg-primary flex items-center justify-center">
-              <FileText className="h-4 w-4 text-primary-foreground" />
+          <div className="flex items-center gap-4">
+            <Link to="/upload" className="flex items-center gap-2">
+              <div className="h-7 w-7 rounded bg-primary flex items-center justify-center">
+                <FileText className="h-4 w-4 text-primary-foreground" />
+              </div>
+              <span className="font-semibold text-lg text-foreground">Continuity</span>
+            </Link>
+            <div className="hidden sm:block border-l border-border pl-4">
+              <TestModeToggle />
             </div>
-            <span className="font-semibold text-lg text-foreground">Continuity</span>
-          </Link>
+          </div>
 
           <nav className="hidden md:flex items-center gap-1">
             {navItems.map((item) => {

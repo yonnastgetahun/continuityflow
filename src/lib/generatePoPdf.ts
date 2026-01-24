@@ -18,6 +18,7 @@ export interface POData {
     unitPrice: number;
     total: number;
   }>;
+  isTestMode?: boolean;
 }
 
 function formatCurrency(value: string | number): string {
@@ -28,8 +29,46 @@ function formatCurrency(value: string | number): string {
 export function generatePoPdf(data: POData): jsPDF {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 20;
   let y = 20;
+
+  // Test Mode Watermark - diagonal across entire page
+  if (data.isTestMode) {
+    doc.saveGraphicsState();
+    doc.setGState(new (doc as any).GState({ opacity: 0.08 }));
+    doc.setFontSize(60);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(0, 0, 0);
+    
+    // Rotate and draw watermark text
+    const centerX = pageWidth / 2;
+    const centerY = pageHeight / 2;
+    
+    // Draw multiple watermarks
+    for (let i = -1; i <= 1; i++) {
+      const offsetY = i * 80;
+      doc.text('TEST — NOT FOR PRODUCTION', centerX, centerY + offsetY, {
+        align: 'center',
+        angle: 45,
+      });
+    }
+    
+    doc.restoreGraphicsState();
+    doc.setTextColor(0, 0, 0);
+  }
+
+  // Test Mode Banner at top
+  if (data.isTestMode) {
+    doc.setFillColor(245, 158, 11); // amber-500
+    doc.rect(0, 0, pageWidth, 12, 'F');
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(255, 255, 255);
+    doc.text('TEST MODE — THIS DOCUMENT IS NOT VALID FOR BILLING OR PRODUCTION USE', pageWidth / 2, 8, { align: 'center' });
+    doc.setTextColor(0, 0, 0);
+    y = 25;
+  }
 
   // Header
   doc.setFontSize(24);
@@ -42,7 +81,7 @@ export function generatePoPdf(data: POData): jsPDF {
   doc.rect(margin, y - 5, pageWidth - margin * 2, 15, 'F');
   doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
-  doc.text(`PO #: ${data.poNumber}`, margin + 5, y + 5);
+  doc.text(`PO #: ${data.poNumber}${data.isTestMode ? ' (TEST)' : ''}`, margin + 5, y + 5);
   doc.text(`Date: ${data.poDate}`, pageWidth - margin - 5, y + 5, { align: 'right' });
   y += 20;
 
@@ -186,11 +225,12 @@ export function downloadPoPdf(data: POData): Promise<void> {
     try {
       const doc = generatePoPdf(data);
       
-      // Generate filename: PO_<number>_<vendor>.pdf
+      // Generate filename: PO_<number>_<vendor>.pdf (with TEST prefix if test mode)
+      const testPrefix = data.isTestMode ? 'TEST_' : '';
       const vendorSlug = data.vendorName 
         ? `_${data.vendorName.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 20)}`
         : '';
-      const filename = `PO_${data.poNumber}${vendorSlug}.pdf`;
+      const filename = `${testPrefix}PO_${data.poNumber}${vendorSlug}.pdf`;
       
       // Get blob and trigger download via anchor
       const blob = doc.output('blob');
