@@ -245,6 +245,16 @@
     color: hsl(var(--warning));
   }
 
+  /* Test Mode - prominent visual indicator */
+  .test-mode-banner {
+    background: hsl(var(--warning));
+    color: white;
+  }
+
+  .test-mode-toggle {
+    --switch-checked: hsl(var(--warning));
+  }
+
   /* ========================================
      CONFIDENCE INDICATORS (functional)
      ======================================== */

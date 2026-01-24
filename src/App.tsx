@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
+import { TestModeProvider } from "@/hooks/useTestMode";
 import { OwnerGuard } from "@/components/OwnerGuard";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
@@ -26,19 +27,21 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
-          <Routes>
-            <Route path="/" element={<Landing />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/restricted" element={<Restricted />} />
-            <Route path="/upload" element={<OwnerGuard><Upload /></OwnerGuard>} />
-            <Route path="/review" element={<OwnerGuard><Review /></OwnerGuard>} />
-            <Route path="/records" element={<OwnerGuard><Records /></OwnerGuard>} />
-            <Route path="/generate" element={<OwnerGuard><Generate /></OwnerGuard>} />
-            <Route path="/exported" element={<OwnerGuard><Exported /></OwnerGuard>} />
-            <Route path="/upgrade" element={<OwnerGuard><Upgrade /></OwnerGuard>} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          <TestModeProvider>
+            <Routes>
+              <Route path="/" element={<Landing />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/restricted" element={<Restricted />} />
+              <Route path="/upload" element={<OwnerGuard><Upload /></OwnerGuard>} />
+              <Route path="/review" element={<OwnerGuard><Review /></OwnerGuard>} />
+              <Route path="/records" element={<OwnerGuard><Records /></OwnerGuard>} />
+              <Route path="/generate" element={<OwnerGuard><Generate /></OwnerGuard>} />
+              <Route path="/exported" element={<OwnerGuard><Exported /></OwnerGuard>} />
+              <Route path="/upgrade" element={<OwnerGuard><Upgrade /></OwnerGuard>} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </TestModeProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
