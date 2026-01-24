@@ -5,9 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { EnvironmentIndicator } from '@/components/EnvironmentIndicator';
 import { FileText, Loader2, AlertCircle, CheckCircle2, Copy, Check, AlertTriangle } from 'lucide-react';
 import { z } from 'zod';
-import { getBrandedName, getEnvironment, isTestEnvironment } from '@/lib/environment';
+import { getEnvironment } from '@/lib/environment';
 
 const passwordSchema = z.object({
   password: z.string().min(6, 'Password must be at least 6 characters'),
@@ -43,9 +44,6 @@ export default function ResetPassword() {
   const correctEnvUrl = envMismatch 
     ? `${ENV_URLS[envFromUrl]}${window.location.pathname}${window.location.search}${window.location.hash}`
     : null;
-  
-  const isTest = envFromUrl === 'test' || isTestEnvironment();
-  const brandName = getBrandedName();
 
   const handleCopyUrl = async () => {
     if (correctEnvUrl) {
@@ -79,10 +77,10 @@ export default function ResetPassword() {
           <span className="font-semibold text-xl">Continuity</span>
         </Link>
 
-        <Card className="w-full max-w-md border-amber-500/50 border-2">
+        <Card className="w-full max-w-md border-warning/50 border-2">
           <CardHeader className="text-center pb-4">
-            <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-amber-500/10 flex items-center justify-center">
-              <AlertTriangle className="h-6 w-6 text-amber-500" />
+            <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-warning/10 flex items-center justify-center">
+              <AlertTriangle className="h-6 w-6 text-warning" />
             </div>
             <CardTitle className="text-xl font-semibold">Wrong Environment</CardTitle>
             <CardDescription className="text-sm mt-2">
@@ -141,17 +139,14 @@ export default function ResetPassword() {
   if (!user) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background px-4">
-        {isTest && (
-          <div className="mb-4 px-3 py-1.5 rounded-full env-test-badge text-xs font-medium">
-            Test Environment
-          </div>
-        )}
-        <Link to="/" className="flex items-center gap-2 mb-8">
+        <Link to="/" className="flex items-center gap-2 mb-6">
           <div className="h-8 w-8 rounded bg-primary flex items-center justify-center">
             <FileText className="h-4 w-4 text-primary-foreground" />
           </div>
           <span className="font-semibold text-xl">Continuity</span>
         </Link>
+
+        <EnvironmentIndicator />
 
         <Card className="w-full max-w-md border">
           <CardHeader className="text-center pb-4">
@@ -198,23 +193,20 @@ export default function ResetPassword() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background px-4">
-      {isTest && (
-        <div className="mb-4 px-3 py-1.5 rounded-full env-test-badge text-xs font-medium">
-          Test Environment
-        </div>
-      )}
-      <Link to="/" className="flex items-center gap-2 mb-8">
+      <Link to="/" className="flex items-center gap-2 mb-6">
         <div className="h-8 w-8 rounded bg-primary flex items-center justify-center">
           <FileText className="h-4 w-4 text-primary-foreground" />
         </div>
         <span className="font-semibold text-xl">Continuity</span>
       </Link>
 
+      <EnvironmentIndicator />
+
       <Card className="w-full max-w-md animate-fade-in border">
         <CardHeader className="text-center pb-4">
           <CardTitle className="text-xl font-semibold">Set New Password</CardTitle>
           <CardDescription className="text-sm">
-            {isTest ? 'Enter your new password for the test environment' : 'Enter your new password below'}
+            Enter your new password below
           </CardDescription>
         </CardHeader>
         <CardContent>
