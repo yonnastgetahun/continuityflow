@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { TestModeProvider } from "@/hooks/useTestMode";
 import { OwnerGuard } from "@/components/OwnerGuard";
+import { AccessGuard } from "@/components/AccessGuard";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import ResetPassword from "./pages/ResetPassword";
@@ -33,11 +34,11 @@ const App = () => (
               <Route path="/login" element={<Login />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/restricted" element={<Restricted />} />
-              <Route path="/upload" element={<OwnerGuard><Upload /></OwnerGuard>} />
-              <Route path="/review" element={<OwnerGuard><Review /></OwnerGuard>} />
-              <Route path="/records" element={<OwnerGuard><Records /></OwnerGuard>} />
-              <Route path="/generate" element={<OwnerGuard><Generate /></OwnerGuard>} />
-              <Route path="/exported" element={<OwnerGuard><Exported /></OwnerGuard>} />
+              <Route path="/upload" element={<AccessGuard><Upload /></AccessGuard>} />
+              <Route path="/review" element={<AccessGuard><Review /></AccessGuard>} />
+              <Route path="/records" element={<AccessGuard><Records /></AccessGuard>} />
+              <Route path="/generate" element={<AccessGuard><Generate /></AccessGuard>} />
+              <Route path="/exported" element={<AccessGuard><Exported /></AccessGuard>} />
               <Route path="/upgrade" element={<OwnerGuard><Upgrade /></OwnerGuard>} />
               <Route path="*" element={<NotFound />} />
             </Routes>

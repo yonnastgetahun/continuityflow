@@ -20,6 +20,7 @@ interface AuthContextType {
   profile: Profile | null;
   loading: boolean;
   ownershipLoading: boolean;
+  roleLoading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -44,6 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [ownershipLoading, setOwnershipLoading] = useState(false);
+  const [roleLoading, setRoleLoading] = useState(false);
   const [isOwnerState, setIsOwnerState] = useState(false);
   const [role, setRole] = useState<AppRole>(null);
 
@@ -60,19 +62,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const fetchRole = async (userId: string) => {
-    const { data, error } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', userId)
-      .order('role')
-      .limit(1)
-      .maybeSingle();
-    
-    if (data && !error) {
-      setRole(data.role as AppRole);
-    } else {
-      // No role assigned yet - default behavior
-      setRole(null);
+    setRoleLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId)
+        .order('role')
+        .limit(1)
+        .maybeSingle();
+      
+      if (data && !error) {
+        setRole(data.role as AppRole);
+      } else {
+        // No role assigned yet - default behavior
+        setRole(null);
+      }
+    } finally {
+      setRoleLoading(false);
     }
   };
 
@@ -117,6 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setRole(null);
           setIsOwnerState(false);
           setOwnershipLoading(false);
+          setRoleLoading(false);
         }
       }
     );
@@ -215,6 +223,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       profile,
       loading,
       ownershipLoading,
+      roleLoading,
       signIn,
       signUp,
       signOut,
