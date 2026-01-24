@@ -14,11 +14,13 @@ import {
   ArrowLeft,
   Building2,
   Calendar,
-  Hash
+  Hash,
+  Loader2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
+import { downloadPoPdf, type POData } from '@/lib/generatePoPdf';
 
 export default function GeneratePage() {
   const navigate = useNavigate();
@@ -85,15 +87,31 @@ export default function GeneratePage() {
     }
   };
 
+  // Build PO data object for PDF generation
+  const buildPoData = (): POData => ({
+    poNumber,
+    poDate,
+    vendorName,
+    vendorAddress,
+    shipTo,
+    billTo,
+    subtotal,
+    tax,
+    total,
+    notes,
+  });
+
   const handleGenerate = async () => {
     if (!user || isReadOnly) return;
 
     setGenerating(true);
     try {
+      // 1. Get vendor_id from invoice if available
       const { data: invoice } = invoiceId 
         ? await supabase.from('invoices').select('vendor_id').eq('id', invoiceId).single()
         : { data: null };
 
+      // 2. Insert PO record
       const { data: po, error } = await supabase
         .from('purchase_orders')
         .insert({
@@ -115,23 +133,32 @@ export default function GeneratePage() {
 
       if (error) throw error;
 
-      toast.success('Purchase Order generated!');
+      // 3. Generate and download PDF
+      const poData = buildPoData();
+      try {
+        await downloadPoPdf(poData);
+        
+        // 4. Update status to exported with timestamp
+        await supabase
+          .from('purchase_orders')
+          .update({ 
+            status: 'exported',
+            exported_at: new Date().toISOString()
+          })
+          .eq('id', po.id);
+
+        toast.success('Purchase Order exported successfully!');
+      } catch (pdfError) {
+        console.error('PDF generation failed:', pdfError);
+        toast.error('PDF download failed. You can try again from the next screen.');
+      }
+
+      // 5. Navigate to exported page
       navigate('/exported', { 
         state: { 
           poId: po.id, 
           poNumber,
-          poData: {
-            poNumber,
-            poDate,
-            vendorName,
-            vendorAddress,
-            shipTo,
-            billTo,
-            subtotal,
-            tax,
-            total,
-            notes,
-          }
+          poData,
         } 
       });
     } catch (error) {
@@ -303,8 +330,17 @@ export default function GeneratePage() {
             disabled={generating || isReadOnly || !poNumber}
             className="gap-2 min-w-48"
           >
-            <Download className="h-4 w-4" />
-            {generating ? 'Generating...' : 'Generate & Export'}
+            {generating ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <Download className="h-4 w-4" />
+                Generate & Download PDF
+              </>
+            )}
           </Button>
         </div>
       </div>

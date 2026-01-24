@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -6,22 +7,52 @@ import {
   Download, 
   FileText,
   ArrowRight,
-  ClipboardList
+  ClipboardList,
+  Loader2,
+  RefreshCw
 } from 'lucide-react';
 import { downloadPoPdf, type POData } from '@/lib/generatePoPdf';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function ExportedPage() {
   const location = useLocation();
-  const { poNumber, poData } = location.state || { poNumber: 'PO-UNKNOWN', poData: null };
+  const { poId, poNumber, poData } = location.state || { 
+    poId: null,
+    poNumber: 'PO-UNKNOWN', 
+    poData: null 
+  };
+  
+  const [downloading, setDownloading] = useState(false);
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (!poData) {
-      toast.error('PDF data not available');
+      toast.error('PDF data not available. Please generate a new PO.');
       return;
     }
-    downloadPoPdf(poData as POData);
-    toast.success('PDF downloaded!');
+
+    setDownloading(true);
+    try {
+      await downloadPoPdf(poData as POData);
+      
+      // Update exported_at timestamp
+      if (poId) {
+        await supabase
+          .from('purchase_orders')
+          .update({ 
+            status: 'exported',
+            exported_at: new Date().toISOString()
+          })
+          .eq('id', poId);
+      }
+      
+      toast.success('PDF downloaded successfully!');
+    } catch (error) {
+      console.error('PDF download failed:', error);
+      toast.error('Failed to generate PDF. Please try again.');
+    } finally {
+      setDownloading(false);
+    }
   };
 
   return (
@@ -53,15 +84,27 @@ export default function ExportedPage() {
                 size="sm" 
                 className="gap-2"
                 onClick={handleDownload}
-                disabled={!poData}
+                disabled={!poData || downloading}
               >
-                <Download className="h-4 w-4" />
-                Download
+                {downloading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Downloading...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-4 w-4" />
+                    Download Again
+                  </>
+                )}
               </Button>
             </div>
             
             <p className="text-sm text-muted-foreground">
-              You can also access this document anytime from your Records.
+              {poData 
+                ? 'You can download the PDF again anytime from this page or your Records.'
+                : 'PDF data not available. Generate a new PO to download.'
+              }
             </p>
           </CardContent>
         </Card>
