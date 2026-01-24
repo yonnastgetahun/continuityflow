@@ -108,37 +108,37 @@ export default function Login() {
     switch (viewMode) {
       case 'signup': return 'Start your 7-day free trial';
       case 'forgot': return 'Enter your email to receive a reset link';
-      default: return 'Sign in to continue to PO Maker';
+      default: return 'Sign in to continue';
     }
   };
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background px-4">
       <Link to="/" className="flex items-center gap-2 mb-8">
-        <div className="h-10 w-10 rounded-lg hero-gradient flex items-center justify-center">
-          <FileText className="h-6 w-6 text-primary-foreground" />
+        <div className="h-8 w-8 rounded bg-primary flex items-center justify-center">
+          <FileText className="h-4 w-4 text-primary-foreground" />
         </div>
-        <span className="font-display font-bold text-2xl">PO Maker</span>
+        <span className="font-semibold text-xl">Continuity</span>
       </Link>
 
-      <Card className="w-full max-w-md animate-scale-in">
-        <CardHeader className="text-center">
-          <CardTitle className="font-display text-2xl">{getTitle()}</CardTitle>
-          <CardDescription>{getDescription()}</CardDescription>
+      <Card className="w-full max-w-md animate-fade-in border">
+        <CardHeader className="text-center pb-4">
+          <CardTitle className="text-xl font-semibold">{getTitle()}</CardTitle>
+          <CardDescription className="text-sm">{getDescription()}</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <div className="flex items-center gap-2 p-3 bg-destructive/10 border border-destructive/30 rounded-lg text-sm text-destructive">
-                <AlertCircle className="h-4 w-4 flex-shrink-0" />
-                <span>{error}</span>
+              <div className="state-error rounded-lg p-3 flex items-center gap-2 text-sm">
+                <AlertCircle className="h-4 w-4 state-error-text flex-shrink-0" />
+                <span className="state-error-text">{error}</span>
               </div>
             )}
 
             {successMessage && (
-              <div className="flex items-center gap-2 p-3 bg-green-500/10 border border-green-500/30 rounded-lg text-sm text-green-600 dark:text-green-400">
-                <CheckCircle2 className="h-4 w-4 flex-shrink-0" />
-                <span>{successMessage}</span>
+              <div className="state-confirmed rounded-lg p-3 flex items-center gap-2 text-sm">
+                <CheckCircle2 className="h-4 w-4 state-confirmed-text flex-shrink-0" />
+                <span className="state-confirmed-text">{successMessage}</span>
               </div>
             )}
 
