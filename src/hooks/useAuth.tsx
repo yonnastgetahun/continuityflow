@@ -16,6 +16,7 @@ interface AuthContextType {
   session: Session | null;
   profile: Profile | null;
   loading: boolean;
+  ownershipLoading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -35,6 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [ownershipLoading, setOwnershipLoading] = useState(false);
   const [isOwnerState, setIsOwnerState] = useState(false);
 
   const fetchProfile = async (userId: string) => {
@@ -50,6 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const checkOwnership = async () => {
+    setOwnershipLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('check-owner');
       if (data && !error) {
@@ -60,6 +63,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       console.error('Error checking ownership:', e);
       setIsOwnerState(false);
+    } finally {
+      setOwnershipLoading(false);
     }
   };
 
@@ -83,16 +88,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } else {
           setProfile(null);
           setIsOwnerState(false);
+          setOwnershipLoading(false);
         }
       }
     );
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
         fetchProfile(session.user.id);
-        checkOwnership();
+        await checkOwnership();
       }
       setLoading(false);
     });
@@ -157,6 +163,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       session,
       profile,
       loading,
+      ownershipLoading,
       signIn,
       signUp,
       signOut,
