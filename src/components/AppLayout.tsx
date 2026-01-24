@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { TrialBanner } from '@/components/TrialBanner';
 import { TestModeBanner } from '@/components/TestModeBanner';
 import { TestModeToggle } from '@/components/TestModeToggle';
+import { EnvironmentDebugFooter } from '@/components/EnvironmentDebugFooter';
 import { Button } from '@/components/ui/button';
 import { 
   FileText, 
@@ -124,6 +125,9 @@ export function AppLayout({ children }: AppLayoutProps) {
       <main className="flex-1 container mx-auto px-4 py-8 pb-24 md:pb-8">
         {children}
       </main>
+
+      {/* Admin Debug Footer */}
+      <EnvironmentDebugFooter />
     </div>
   );
 }
