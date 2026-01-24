@@ -19,11 +19,16 @@ export default defineConfig(({ mode }) => ({
     esbuildOptions: {
       target: "esnext",
     },
+    // Ensure pdfjs-dist and its dependencies use same React instance
+    include: ['pdfjs-dist'],
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      // Force single React instance
+      "react": path.resolve(__dirname, "./node_modules/react"),
+      "react-dom": path.resolve(__dirname, "./node_modules/react-dom"),
     },
   },
 }));
