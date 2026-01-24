@@ -2,6 +2,9 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { getEnvironment, type AppEnvironment } from '@/lib/environment';
+
+export type AppRole = 'owner' | 'collaborator' | 'viewer' | null;
+
 interface Profile {
   id: string;
   email: string;
@@ -28,6 +31,9 @@ interface AuthContextType {
   canUseApp: boolean;
   isReadOnly: boolean;
   environment: AppEnvironment;
+  role: AppRole;
+  canEdit: boolean;
+  canManage: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -39,6 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [ownershipLoading, setOwnershipLoading] = useState(false);
   const [isOwnerState, setIsOwnerState] = useState(false);
+  const [role, setRole] = useState<AppRole>(null);
 
   const fetchProfile = async (userId: string) => {
     const { data, error } = await supabase
@@ -49,6 +56,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     
     if (data && !error) {
       setProfile(data as Profile);
+    }
+  };
+
+  const fetchRole = async (userId: string) => {
+    const { data, error } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId)
+      .order('role')
+      .limit(1)
+      .maybeSingle();
+    
+    if (data && !error) {
+      setRole(data.role as AppRole);
+    } else {
+      // No role assigned yet - default behavior
+      setRole(null);
     }
   };
 
@@ -72,6 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshProfile = async () => {
     if (user) {
       await fetchProfile(user.id);
+      await fetchRole(user.id);
     }
   };
 
@@ -84,10 +109,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (session?.user) {
           setTimeout(() => {
             fetchProfile(session.user.id);
+            fetchRole(session.user.id);
             checkOwnership();
           }, 0);
         } else {
           setProfile(null);
+          setRole(null);
           setIsOwnerState(false);
           setOwnershipLoading(false);
         }
@@ -99,6 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(session?.user ?? null);
       if (session?.user) {
         fetchProfile(session.user.id);
+        fetchRole(session.user.id);
         await checkOwnership();
       }
       setLoading(false);
@@ -174,6 +202,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Read only mode: trial expired and not subscribed
   const isReadOnly = profile?.subscription_status === 'trial_expired';
 
+  // Role-based permissions (expectation, not strict enforcement)
+  // Owner or no role assigned (legacy single-user) can manage
+  const canManage = role === 'owner' || (role === null && isOwner);
+  // Owner and collaborator can edit, viewer cannot
+  const canEdit = role === 'owner' || role === 'collaborator' || (role === null && isOwner);
+
   return (
     <AuthContext.Provider value={{
       user,
@@ -192,6 +226,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       canUseApp,
       isReadOnly,
       environment,
+      role,
+      canEdit,
+      canManage,
     }}>
       {children}
     </AuthContext.Provider>

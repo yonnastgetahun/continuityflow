@@ -24,8 +24,25 @@ const navItems = [
 ];
 
 export function AppLayout({ children }: AppLayoutProps) {
-  const { signOut, user, profile } = useAuth();
+  const { signOut, user, profile, role } = useAuth();
   const location = useLocation();
+
+  const getRoleBadge = () => {
+    if (!role) return null;
+    
+    const roleConfig = {
+      owner: { label: 'Owner', className: 'state-ready' },
+      collaborator: { label: 'Collaborator', className: 'state-attention' },
+      viewer: { label: 'Viewer', className: 'bg-muted text-muted-foreground' },
+    };
+    
+    const config = roleConfig[role];
+    return (
+      <span className={`text-xs px-2 py-1 rounded-full font-medium ${config.className}`}>
+        {config.label}
+      </span>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -64,6 +81,7 @@ export function AppLayout({ children }: AppLayoutProps) {
             <span className="text-sm text-muted-foreground hidden sm:inline">
               {user?.email}
             </span>
+            {getRoleBadge()}
             {profile?.subscription_status === 'subscribed' && (
               <span className="trust-badge text-xs px-2 py-1 rounded-full font-medium">
                 {profile.plan_type?.toUpperCase()}
