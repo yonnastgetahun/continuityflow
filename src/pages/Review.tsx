@@ -23,7 +23,8 @@ import {
   PanelLeftClose,
   PanelLeft,
   UserCheck,
-  CircleDot
+  CircleDot,
+  ScanLine
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -168,8 +169,6 @@ export default function ReviewPage() {
   const [activeDoc, setActiveDoc] = useState<'invoice' | 'w9'>('invoice');
   const [viewerPage, setViewerPage] = useState(1);
   const [highlightSnippet, setHighlightSnippet] = useState<string | undefined>();
-
-  // Track which fields have been confirmed by user editing
   const [confirmedFields, setConfirmedFields] = useState<ConfirmedFields>({});
 
   const { invoiceDoc, w9Doc, extractedFields, invoiceFile, w9File } = (location.state || {}) as {
@@ -181,7 +180,9 @@ export default function ReviewPage() {
     storeDocuments?: boolean;
   };
 
-  const fields: ExtractedFields = extractedFields || {
+  const isScanned = invoiceDoc?.isScanned || w9Doc?.isScanned;
+
+  const baseFields: ExtractedFields = extractedFields || {
     vendor: {
       name: createDefaultField(),
       address: createDefaultField(),
@@ -202,6 +203,42 @@ export default function ReviewPage() {
     },
   };
 
+  // For scanned documents, override all field confidences to 'low'
+  const getFieldWithScannedOverride = (field: ExtractedField): ExtractedField => {
+    if (isScanned) {
+      return {
+        ...field,
+        confidence: 'low',
+        evidence: {
+          ...field.evidence,
+          snippet: field.value ? field.evidence.snippet : 'Scanned document - manual entry required',
+        },
+      };
+    }
+    return field;
+  };
+
+  const fields: ExtractedFields = useMemo(() => ({
+    vendor: {
+      name: getFieldWithScannedOverride(baseFields.vendor.name),
+      address: getFieldWithScannedOverride(baseFields.vendor.address),
+      city: getFieldWithScannedOverride(baseFields.vendor.city),
+      state: getFieldWithScannedOverride(baseFields.vendor.state),
+      zip: getFieldWithScannedOverride(baseFields.vendor.zip),
+      taxId: getFieldWithScannedOverride(baseFields.vendor.taxId),
+      email: getFieldWithScannedOverride(baseFields.vendor.email),
+      phone: getFieldWithScannedOverride(baseFields.vendor.phone),
+    },
+    invoice: {
+      invoiceNumber: getFieldWithScannedOverride(baseFields.invoice.invoiceNumber),
+      invoiceDate: getFieldWithScannedOverride(baseFields.invoice.invoiceDate),
+      dueDate: getFieldWithScannedOverride(baseFields.invoice.dueDate),
+      subtotal: getFieldWithScannedOverride(baseFields.invoice.subtotal),
+      tax: getFieldWithScannedOverride(baseFields.invoice.tax),
+      total: getFieldWithScannedOverride(baseFields.invoice.total),
+    },
+  }), [isScanned, baseFields]);
+
   // Editable fields state
   const [vendorName, setVendorName] = useState(fields.vendor.name.value);
   const [vendorAddress, setVendorAddress] = useState(fields.vendor.address.value);
@@ -219,7 +256,6 @@ export default function ReviewPage() {
   const [tax, setTax] = useState(fields.invoice.tax.value);
   const [total, setTotal] = useState(fields.invoice.total.value);
 
-  // Helper to mark field as confirmed when user edits it
   const handleFieldChange = (fieldKey: FieldKey, value: string, setter: (v: string) => void) => {
     setter(value);
     if (!confirmedFields[fieldKey]) {
@@ -227,7 +263,6 @@ export default function ReviewPage() {
     }
   };
 
-  // Check if required fields are filled and confirmed
   const requiredFieldsStatus = useMemo(() => {
     const vendorNameValid = vendorName.trim().length > 0 && confirmedFields.vendorName;
     const invoiceDateValid = (invoiceDate.trim().length > 0 || invoiceDate.toLowerCase() === 'unknown') && confirmedFields.invoiceDate;
@@ -241,24 +276,26 @@ export default function ReviewPage() {
     };
   }, [vendorName, invoiceDate, total, confirmedFields]);
 
-  // Auto-confirm fields that have high confidence extracted values
+  // Auto-confirm fields that have high confidence extracted values (only for non-scanned docs)
   useEffect(() => {
+    if (isScanned) return; // Don't auto-confirm for scanned documents
+    
     const autoConfirm: ConfirmedFields = {};
     
-    if (fields.vendor.name.confidence === 'high' && fields.vendor.name.value) {
+    if (baseFields.vendor.name.confidence === 'high' && baseFields.vendor.name.value) {
       autoConfirm.vendorName = true;
     }
-    if (fields.invoice.invoiceDate.confidence === 'high' && fields.invoice.invoiceDate.value) {
+    if (baseFields.invoice.invoiceDate.confidence === 'high' && baseFields.invoice.invoiceDate.value) {
       autoConfirm.invoiceDate = true;
     }
-    if (fields.invoice.total.confidence === 'high' && fields.invoice.total.value) {
+    if (baseFields.invoice.total.confidence === 'high' && baseFields.invoice.total.value) {
       autoConfirm.total = true;
     }
     
     if (Object.keys(autoConfirm).length > 0) {
       setConfirmedFields(prev => ({ ...prev, ...autoConfirm }));
     }
-  }, []);
+  }, [isScanned]);
 
   useEffect(() => {
     if (!invoiceDoc && !location.state) {
@@ -354,8 +391,6 @@ export default function ReviewPage() {
     }
   };
 
-  const isScanned = invoiceDoc?.isScanned || w9Doc?.isScanned;
-
   return (
     <AppLayout>
       <div className="h-[calc(100vh-8rem)] flex flex-col">
@@ -379,6 +414,20 @@ export default function ReviewPage() {
           </Button>
         </div>
 
+        {/* Scanned Document Banner */}
+        {isScanned && (
+          <div className="flex items-start gap-3 p-4 mb-4 bg-amber-500/10 border border-amber-500/30 rounded-lg animate-scale-in">
+            <ScanLine className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-medium text-amber-600 dark:text-amber-400">Scanned PDF Detected</p>
+              <p className="text-sm text-muted-foreground">
+                This appears to be a scanned PDF. OCR is not enabled yet. Please enter fields manually.
+                All fields are set to low confidence until confirmed.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Required Fields Notice */}
         {!requiredFieldsStatus.allValid && (
           <div className="flex items-start gap-3 p-3 mb-4 bg-muted border rounded-lg">
@@ -391,19 +440,6 @@ export default function ReviewPage() {
                 <span className={requiredFieldsStatus.invoiceDate ? 'text-green-600' : 'text-destructive'}>Invoice Date</span>
                 {', '}
                 <span className={requiredFieldsStatus.total ? 'text-green-600' : 'text-destructive'}>Total</span>
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Scanned Warning */}
-        {isScanned && (
-          <div className="flex items-start gap-3 p-3 mb-4 bg-warning/10 border border-warning/30 rounded-lg">
-            <FileWarning className="h-5 w-5 text-warning flex-shrink-0" />
-            <div>
-              <p className="font-medium text-warning text-sm">Scanned Document Detected</p>
-              <p className="text-xs text-muted-foreground">
-                Fields may be empty or inaccurate. Please review manually.
               </p>
             </div>
           </div>
