@@ -1,11 +1,20 @@
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ShieldX, LogOut, FileText } from 'lucide-react';
 
 export default function Restricted() {
-  const { signOut, user } = useAuth();
+  const { signOut, user, loading, ownershipLoading, roleLoading, isOwner, role } = useAuth();
+
+  // If the user is actually authorized (e.g. collaborator) don't leave them stranded here.
+  if (!loading && !ownershipLoading && !roleLoading && user) {
+    const isAuthorized =
+      isOwner || role === 'owner' || role === 'collaborator' || role === 'viewer';
+    if (isAuthorized) {
+      return <Navigate to="/upload" replace />;
+    }
+  }
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background px-4">
