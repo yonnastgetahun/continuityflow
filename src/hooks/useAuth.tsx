@@ -35,7 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [ownerEmail, setOwnerEmail] = useState<string | null>(null);
+  const [isOwnerState, setIsOwnerState] = useState(false);
 
   const fetchProfile = async (userId: string) => {
     const { data, error } = await supabase
@@ -49,26 +49,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const checkOwnership = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('check-owner');
+      if (data && !error) {
+        setIsOwnerState(data.isOwner === true);
+      } else {
+        setIsOwnerState(false);
+      }
+    } catch (e) {
+      console.error('Error checking ownership:', e);
+      setIsOwnerState(false);
+    }
+  };
+
   const refreshProfile = async () => {
     if (user) {
       await fetchProfile(user.id);
     }
   };
-
-  useEffect(() => {
-    // Fetch owner email from edge function
-    const fetchOwnerEmail = async () => {
-      try {
-        const { data, error } = await supabase.functions.invoke('check-owner');
-        if (data && !error) {
-          setOwnerEmail(data.ownerEmail);
-        }
-      } catch (e) {
-        console.error('Error fetching owner email:', e);
-      }
-    };
-    fetchOwnerEmail();
-  }, []);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -79,9 +78,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (session?.user) {
           setTimeout(() => {
             fetchProfile(session.user.id);
+            checkOwnership();
           }, 0);
         } else {
           setProfile(null);
+          setIsOwnerState(false);
         }
       }
     );
@@ -91,6 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(session?.user ?? null);
       if (session?.user) {
         fetchProfile(session.user.id);
+        checkOwnership();
       }
       setLoading(false);
     });
@@ -133,7 +135,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error as Error | null };
   };
 
-  const isOwner = !!(user && ownerEmail && user.email?.toLowerCase() === ownerEmail.toLowerCase());
+  const isOwner = isOwnerState;
 
   // Calculate trial days left
   const trialDaysLeft = profile?.trial_ends_at
