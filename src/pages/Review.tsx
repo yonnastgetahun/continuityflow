@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { AppLayout } from '@/components/AppLayout';
 import { useAuth } from '@/hooks/useAuth';
@@ -9,7 +9,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { 
   FileText, 
   Check, 
@@ -22,11 +21,22 @@ import {
   FileWarning,
   ExternalLink,
   PanelLeftClose,
-  PanelLeft
+  PanelLeft,
+  UserCheck,
+  CircleDot
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { ParsedDocument, ExtractedFields, ExtractedField, FieldEvidence } from '@/lib/pdfParser';
+
+type FieldKey = 
+  | 'vendorName' | 'vendorAddress' | 'vendorCity' | 'vendorState' | 'vendorZip' 
+  | 'vendorTaxId' | 'vendorEmail' | 'vendorPhone'
+  | 'invoiceNumber' | 'invoiceDate' | 'dueDate' | 'subtotal' | 'tax' | 'total';
+
+interface ConfirmedFields {
+  [key: string]: boolean;
+}
 
 interface JumpToSourceProps {
   evidence: FieldEvidence;
@@ -44,12 +54,27 @@ function JumpToSourceButton({ evidence, onJump }: JumpToSourceProps) {
       onClick={() => onJump(evidence)}
     >
       <ExternalLink className="h-3 w-3" />
-      Jump to source
+      Source
     </Button>
   );
 }
 
-function ConfidenceBadge({ confidence }: { confidence: 'high' | 'medium' | 'low' }) {
+function ConfidenceBadge({ 
+  confidence, 
+  isConfirmed 
+}: { 
+  confidence: 'high' | 'medium' | 'low'; 
+  isConfirmed?: boolean;
+}) {
+  if (isConfirmed) {
+    return (
+      <span className="bg-primary/20 text-primary text-xs px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+        <UserCheck className="h-3 w-3" />
+        Confirmed
+      </span>
+    );
+  }
+
   const config = {
     high: { icon: Check, className: 'bg-green-500/20 text-green-600 dark:text-green-400', label: 'High' },
     medium: { icon: AlertTriangle, className: 'bg-yellow-500/20 text-yellow-600 dark:text-yellow-400', label: 'Review' },
@@ -66,30 +91,68 @@ function ConfidenceBadge({ confidence }: { confidence: 'high' | 'medium' | 'low'
   );
 }
 
+interface RequiredIndicatorProps {
+  isRequired: boolean;
+  isFilled: boolean;
+  isConfirmed: boolean;
+}
+
+function RequiredIndicator({ isRequired, isFilled, isConfirmed }: RequiredIndicatorProps) {
+  if (!isRequired) return null;
+  
+  if (isFilled && isConfirmed) {
+    return <Check className="h-3 w-3 text-green-500" />;
+  }
+  
+  return (
+    <span title="Required field">
+      <CircleDot className="h-3 w-3 text-destructive" />
+    </span>
+  );
+}
+
 interface EditableFieldProps {
   label: string;
   field: ExtractedField;
   value: string;
   onChange: (value: string) => void;
   onJumpToSource: (evidence: FieldEvidence) => void;
+  isConfirmed: boolean;
+  isRequired?: boolean;
 }
 
-function EditableField({ label, field, value, onChange, onJumpToSource }: EditableFieldProps) {
+function EditableField({ 
+  label, 
+  field, 
+  value, 
+  onChange, 
+  onJumpToSource, 
+  isConfirmed,
+  isRequired = false
+}: EditableFieldProps) {
+  const isFilled = value.trim().length > 0;
+  
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between gap-2">
-        <Label className="text-sm">{label}</Label>
+        <div className="flex items-center gap-1.5">
+          <Label className="text-sm">{label}</Label>
+          <RequiredIndicator isRequired={isRequired} isFilled={isFilled} isConfirmed={isConfirmed} />
+        </div>
         <div className="flex items-center gap-1">
-          <ConfidenceBadge confidence={field.confidence} />
+          <ConfidenceBadge confidence={field.confidence} isConfirmed={isConfirmed} />
           <JumpToSourceButton evidence={field.evidence} onJump={onJumpToSource} />
         </div>
       </div>
-      <Input value={value} onChange={(e) => onChange(e.target.value)} className="h-9" />
+      <Input 
+        value={value} 
+        onChange={(e) => onChange(e.target.value)} 
+        className={`h-9 ${isRequired && !isFilled ? 'border-destructive/50' : ''}`}
+      />
     </div>
   );
 }
 
-// Default field for when no data is available
 const createDefaultField = (): ExtractedField => ({
   value: '',
   confidence: 'low',
@@ -106,7 +169,9 @@ export default function ReviewPage() {
   const [viewerPage, setViewerPage] = useState(1);
   const [highlightSnippet, setHighlightSnippet] = useState<string | undefined>();
 
-  // Get parsed data from navigation state
+  // Track which fields have been confirmed by user editing
+  const [confirmedFields, setConfirmedFields] = useState<ConfirmedFields>({});
+
   const { invoiceDoc, w9Doc, extractedFields, invoiceFile, w9File } = (location.state || {}) as {
     invoiceDoc?: ParsedDocument;
     w9Doc?: ParsedDocument;
@@ -116,7 +181,6 @@ export default function ReviewPage() {
     storeDocuments?: boolean;
   };
 
-  // Default empty extracted data
   const fields: ExtractedFields = extractedFields || {
     vendor: {
       name: createDefaultField(),
@@ -155,6 +219,47 @@ export default function ReviewPage() {
   const [tax, setTax] = useState(fields.invoice.tax.value);
   const [total, setTotal] = useState(fields.invoice.total.value);
 
+  // Helper to mark field as confirmed when user edits it
+  const handleFieldChange = (fieldKey: FieldKey, value: string, setter: (v: string) => void) => {
+    setter(value);
+    if (!confirmedFields[fieldKey]) {
+      setConfirmedFields(prev => ({ ...prev, [fieldKey]: true }));
+    }
+  };
+
+  // Check if required fields are filled and confirmed
+  const requiredFieldsStatus = useMemo(() => {
+    const vendorNameValid = vendorName.trim().length > 0 && confirmedFields.vendorName;
+    const invoiceDateValid = (invoiceDate.trim().length > 0 || invoiceDate.toLowerCase() === 'unknown') && confirmedFields.invoiceDate;
+    const totalValid = total.trim().length > 0 && confirmedFields.total;
+
+    return {
+      vendorName: vendorNameValid,
+      invoiceDate: invoiceDateValid,
+      total: totalValid,
+      allValid: vendorNameValid && invoiceDateValid && totalValid,
+    };
+  }, [vendorName, invoiceDate, total, confirmedFields]);
+
+  // Auto-confirm fields that have high confidence extracted values
+  useEffect(() => {
+    const autoConfirm: ConfirmedFields = {};
+    
+    if (fields.vendor.name.confidence === 'high' && fields.vendor.name.value) {
+      autoConfirm.vendorName = true;
+    }
+    if (fields.invoice.invoiceDate.confidence === 'high' && fields.invoice.invoiceDate.value) {
+      autoConfirm.invoiceDate = true;
+    }
+    if (fields.invoice.total.confidence === 'high' && fields.invoice.total.value) {
+      autoConfirm.total = true;
+    }
+    
+    if (Object.keys(autoConfirm).length > 0) {
+      setConfirmedFields(prev => ({ ...prev, ...autoConfirm }));
+    }
+  }, []);
+
   useEffect(() => {
     if (!invoiceDoc && !location.state) {
       navigate('/upload');
@@ -167,12 +272,16 @@ export default function ReviewPage() {
     setHighlightSnippet(evidence.snippet);
     setShowViewer(true);
     
-    // Clear highlight after a delay
     setTimeout(() => setHighlightSnippet(undefined), 5000);
   };
 
   const handleSave = async () => {
     if (!user || isReadOnly) return;
+
+    if (!requiredFieldsStatus.allValid) {
+      toast.error('Please confirm all required fields before saving.');
+      return;
+    }
 
     setIsSaving(true);
     try {
@@ -201,7 +310,7 @@ export default function ReviewPage() {
       if (vendorError) throw vendorError;
 
       const parseDate = (dateStr: string): string | null => {
-        if (!dateStr) return null;
+        if (!dateStr || dateStr.toLowerCase() === 'unknown') return null;
         const date = new Date(dateStr);
         if (!isNaN(date.getTime())) {
           return date.toISOString().split('T')[0];
@@ -246,8 +355,6 @@ export default function ReviewPage() {
   };
 
   const isScanned = invoiceDoc?.isScanned || w9Doc?.isScanned;
-  const currentFile = activeDoc === 'invoice' ? invoiceFile : w9File;
-  const currentFileName = activeDoc === 'invoice' ? invoiceDoc?.fileName : w9Doc?.fileName;
 
   return (
     <AppLayout>
@@ -272,6 +379,23 @@ export default function ReviewPage() {
           </Button>
         </div>
 
+        {/* Required Fields Notice */}
+        {!requiredFieldsStatus.allValid && (
+          <div className="flex items-start gap-3 p-3 mb-4 bg-muted border rounded-lg">
+            <Info className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+            <div>
+              <p className="font-medium text-sm">Required fields must be confirmed</p>
+              <p className="text-xs text-muted-foreground">
+                Edit or verify: <span className={requiredFieldsStatus.vendorName ? 'text-green-600' : 'text-destructive'}>Vendor Name</span>
+                {', '}
+                <span className={requiredFieldsStatus.invoiceDate ? 'text-green-600' : 'text-destructive'}>Invoice Date</span>
+                {', '}
+                <span className={requiredFieldsStatus.total ? 'text-green-600' : 'text-destructive'}>Total</span>
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Scanned Warning */}
         {isScanned && (
           <div className="flex items-start gap-3 p-3 mb-4 bg-warning/10 border border-warning/30 rounded-lg">
@@ -290,7 +414,6 @@ export default function ReviewPage() {
           {/* PDF Viewer Panel */}
           {showViewer && (
             <div className="w-[400px] flex-shrink-0 flex flex-col bg-card rounded-lg border overflow-hidden">
-              {/* Document Tabs */}
               <Tabs value={activeDoc} onValueChange={(v) => setActiveDoc(v as 'invoice' | 'w9')} className="flex flex-col h-full">
                 <TabsList className="w-full justify-start rounded-none border-b bg-muted/30 p-0 h-auto">
                   <TabsTrigger 
@@ -350,60 +473,69 @@ export default function ReviewPage() {
                     label="Vendor Name"
                     field={fields.vendor.name}
                     value={vendorName}
-                    onChange={setVendorName}
+                    onChange={(v) => handleFieldChange('vendorName', v, setVendorName)}
                     onJumpToSource={handleJumpToSource}
+                    isConfirmed={!!confirmedFields.vendorName}
+                    isRequired
                   />
                   <EditableField
                     label="Address"
                     field={fields.vendor.address}
                     value={vendorAddress}
-                    onChange={setVendorAddress}
+                    onChange={(v) => handleFieldChange('vendorAddress', v, setVendorAddress)}
                     onJumpToSource={handleJumpToSource}
+                    isConfirmed={!!confirmedFields.vendorAddress}
                   />
                   <div className="grid grid-cols-3 gap-2">
                     <EditableField
                       label="City"
                       field={fields.vendor.city}
                       value={vendorCity}
-                      onChange={setVendorCity}
+                      onChange={(v) => handleFieldChange('vendorCity', v, setVendorCity)}
                       onJumpToSource={handleJumpToSource}
+                      isConfirmed={!!confirmedFields.vendorCity}
                     />
                     <EditableField
                       label="State"
                       field={fields.vendor.state}
                       value={vendorState}
-                      onChange={setVendorState}
+                      onChange={(v) => handleFieldChange('vendorState', v, setVendorState)}
                       onJumpToSource={handleJumpToSource}
+                      isConfirmed={!!confirmedFields.vendorState}
                     />
                     <EditableField
                       label="ZIP"
                       field={fields.vendor.zip}
                       value={vendorZip}
-                      onChange={setVendorZip}
+                      onChange={(v) => handleFieldChange('vendorZip', v, setVendorZip)}
                       onJumpToSource={handleJumpToSource}
+                      isConfirmed={!!confirmedFields.vendorZip}
                     />
                   </div>
                   <EditableField
                     label="Tax ID"
                     field={fields.vendor.taxId}
                     value={vendorTaxId}
-                    onChange={setVendorTaxId}
+                    onChange={(v) => handleFieldChange('vendorTaxId', v, setVendorTaxId)}
                     onJumpToSource={handleJumpToSource}
+                    isConfirmed={!!confirmedFields.vendorTaxId}
                   />
                   <div className="grid grid-cols-2 gap-2">
                     <EditableField
                       label="Email"
                       field={fields.vendor.email}
                       value={vendorEmail}
-                      onChange={setVendorEmail}
+                      onChange={(v) => handleFieldChange('vendorEmail', v, setVendorEmail)}
                       onJumpToSource={handleJumpToSource}
+                      isConfirmed={!!confirmedFields.vendorEmail}
                     />
                     <EditableField
                       label="Phone"
                       field={fields.vendor.phone}
                       value={vendorPhone}
-                      onChange={setVendorPhone}
+                      onChange={(v) => handleFieldChange('vendorPhone', v, setVendorPhone)}
                       onJumpToSource={handleJumpToSource}
+                      isConfirmed={!!confirmedFields.vendorPhone}
                     />
                   </div>
                 </CardContent>
@@ -422,23 +554,27 @@ export default function ReviewPage() {
                     label="Invoice Number"
                     field={fields.invoice.invoiceNumber}
                     value={invoiceNumber}
-                    onChange={setInvoiceNumber}
+                    onChange={(v) => handleFieldChange('invoiceNumber', v, setInvoiceNumber)}
                     onJumpToSource={handleJumpToSource}
+                    isConfirmed={!!confirmedFields.invoiceNumber}
                   />
                   <div className="grid grid-cols-2 gap-2">
                     <EditableField
                       label="Invoice Date"
                       field={fields.invoice.invoiceDate}
                       value={invoiceDate}
-                      onChange={setInvoiceDate}
+                      onChange={(v) => handleFieldChange('invoiceDate', v, setInvoiceDate)}
                       onJumpToSource={handleJumpToSource}
+                      isConfirmed={!!confirmedFields.invoiceDate}
+                      isRequired
                     />
                     <EditableField
                       label="Due Date"
                       field={fields.invoice.dueDate}
                       value={dueDate}
-                      onChange={setDueDate}
+                      onChange={(v) => handleFieldChange('dueDate', v, setDueDate)}
                       onJumpToSource={handleJumpToSource}
+                      isConfirmed={!!confirmedFields.dueDate}
                     />
                   </div>
 
@@ -448,11 +584,11 @@ export default function ReviewPage() {
                     <div className="flex items-center justify-between gap-2">
                       <Label className="text-sm">Subtotal</Label>
                       <div className="flex items-center gap-1">
-                        <ConfidenceBadge confidence={fields.invoice.subtotal.confidence} />
+                        <ConfidenceBadge confidence={fields.invoice.subtotal.confidence} isConfirmed={!!confirmedFields.subtotal} />
                         <JumpToSourceButton evidence={fields.invoice.subtotal.evidence} onJump={handleJumpToSource} />
                         <Input 
                           value={subtotal} 
-                          onChange={(e) => setSubtotal(e.target.value)}
+                          onChange={(e) => handleFieldChange('subtotal', e.target.value, setSubtotal)}
                           className="w-28 text-right h-9"
                           placeholder="0.00"
                         />
@@ -461,11 +597,11 @@ export default function ReviewPage() {
                     <div className="flex items-center justify-between gap-2">
                       <Label className="text-sm">Tax</Label>
                       <div className="flex items-center gap-1">
-                        <ConfidenceBadge confidence={fields.invoice.tax.confidence} />
+                        <ConfidenceBadge confidence={fields.invoice.tax.confidence} isConfirmed={!!confirmedFields.tax} />
                         <JumpToSourceButton evidence={fields.invoice.tax.evidence} onJump={handleJumpToSource} />
                         <Input 
                           value={tax} 
-                          onChange={(e) => setTax(e.target.value)}
+                          onChange={(e) => handleFieldChange('tax', e.target.value, setTax)}
                           className="w-28 text-right h-9"
                           placeholder="0.00"
                         />
@@ -473,14 +609,21 @@ export default function ReviewPage() {
                     </div>
                     <Separator className="my-2" />
                     <div className="flex items-center justify-between gap-2">
-                      <Label className="text-sm font-semibold">Total</Label>
+                      <div className="flex items-center gap-1.5">
+                        <Label className="text-sm font-semibold">Total</Label>
+                        <RequiredIndicator 
+                          isRequired 
+                          isFilled={total.trim().length > 0} 
+                          isConfirmed={!!confirmedFields.total} 
+                        />
+                      </div>
                       <div className="flex items-center gap-1">
-                        <ConfidenceBadge confidence={fields.invoice.total.confidence} />
+                        <ConfidenceBadge confidence={fields.invoice.total.confidence} isConfirmed={!!confirmedFields.total} />
                         <JumpToSourceButton evidence={fields.invoice.total.evidence} onJump={handleJumpToSource} />
                         <Input 
                           value={total} 
-                          onChange={(e) => setTotal(e.target.value)}
-                          className="w-28 text-right h-9 font-semibold"
+                          onChange={(e) => handleFieldChange('total', e.target.value, setTotal)}
+                          className={`w-28 text-right h-9 font-semibold ${!total.trim() ? 'border-destructive/50' : ''}`}
                           placeholder="0.00"
                         />
                       </div>
@@ -491,16 +634,21 @@ export default function ReviewPage() {
             </div>
 
             {/* Save Button */}
-            <div className="flex justify-center py-4">
+            <div className="flex flex-col items-center gap-2 py-4">
               <Button
                 size="lg"
                 onClick={handleSave}
-                disabled={isSaving || isReadOnly}
+                disabled={isSaving || isReadOnly || !requiredFieldsStatus.allValid}
                 className="gap-2 min-w-48"
               >
                 <Save className="h-4 w-4" />
                 {isSaving ? 'Saving...' : 'Save Records'}
               </Button>
+              {!requiredFieldsStatus.allValid && (
+                <p className="text-xs text-muted-foreground">
+                  Confirm required fields to enable saving
+                </p>
+              )}
             </div>
 
             {profile?.subscription_status === 'trial_not_started' && (
