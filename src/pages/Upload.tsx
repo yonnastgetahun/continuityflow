@@ -13,9 +13,12 @@ import {
   AlertCircle,
   Shield,
   Lock,
-  Sparkles
+  Sparkles,
+  Loader2,
+  AlertTriangle
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { parsePDF, extractFieldsFromText, ParsedDocument, ExtractedFields } from '@/lib/pdfParser';
 
 interface UploadedFile {
   file: File;
@@ -30,6 +33,8 @@ export default function UploadPage() {
   const [w9File, setW9File] = useState<UploadedFile | null>(null);
   const [storeDocuments, setStoreDocuments] = useState(false);
   const [isDragging, setIsDragging] = useState<'invoice' | 'w9' | null>(null);
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [extractionError, setExtractionError] = useState<string | null>(null);
 
   const isPro = profile?.plan_type === 'pro' || 
     (profile?.subscription_status === 'trial_active' || 
@@ -38,6 +43,7 @@ export default function UploadPage() {
   const handleDrop = useCallback((e: React.DragEvent, type: 'invoice' | 'w9') => {
     e.preventDefault();
     setIsDragging(null);
+    setExtractionError(null);
 
     if (isReadOnly) {
       toast.error('App is in read-only mode. Please upgrade to continue.');
@@ -57,6 +63,8 @@ export default function UploadPage() {
   }, [isReadOnly]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, type: 'invoice' | 'w9') => {
+    setExtractionError(null);
+    
     if (isReadOnly) {
       toast.error('App is in read-only mode. Please upgrade to continue.');
       return;
@@ -85,21 +93,55 @@ export default function UploadPage() {
       return;
     }
 
-    // Store files in session storage for the review page
-    // In a real app, this would call an extraction API
-    sessionStorage.setItem('uploadedInvoice', JSON.stringify({
-      name: invoiceFile.name,
-      storeDocuments
-    }));
-    
-    if (w9File) {
-      sessionStorage.setItem('uploadedW9', JSON.stringify({
-        name: w9File.name
-      }));
-    }
+    setIsExtracting(true);
+    setExtractionError(null);
 
-    toast.success('Processing documents...');
-    navigate('/review');
+    try {
+      // Parse invoice PDF
+      const invoiceDoc = await parsePDF(invoiceFile.file, 'invoice');
+      
+      // Parse W9 PDF if provided
+      let w9Doc: ParsedDocument | undefined;
+      if (w9File) {
+        w9Doc = await parsePDF(w9File.file, 'w9');
+      }
+
+      // Check if documents are scanned (no text)
+      const warnings: string[] = [];
+      if (invoiceDoc.isScanned) {
+        warnings.push('Invoice appears to be scanned (no selectable text). Manual entry may be required.');
+      }
+      if (w9Doc?.isScanned) {
+        warnings.push('W9 appears to be scanned (no selectable text). Manual entry may be required.');
+      }
+
+      // Extract fields from parsed text
+      const extractedFields = extractFieldsFromText(invoiceDoc, w9Doc);
+
+      // Show warnings if any
+      if (warnings.length > 0) {
+        warnings.forEach(warning => toast.warning(warning));
+      }
+
+      // Navigate to review with extracted data
+      navigate('/review', { 
+        state: { 
+          invoiceDoc,
+          w9Doc,
+          extractedFields,
+          storeDocuments,
+        } 
+      });
+
+      toast.success('Documents parsed successfully!');
+    } catch (error) {
+      console.error('Extraction error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to parse PDF documents';
+      setExtractionError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
+      setIsExtracting(false);
+    }
   };
 
   return (
@@ -120,6 +162,16 @@ export default function UploadPage() {
               <p className="text-sm text-muted-foreground">
                 Your trial has expired. Upgrade to upload and process new documents.
               </p>
+            </div>
+          </div>
+        )}
+
+        {extractionError && (
+          <div className="flex items-center gap-3 p-4 bg-destructive/10 border border-destructive/30 rounded-lg animate-scale-in">
+            <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0" />
+            <div>
+              <p className="font-medium text-destructive">Extraction Failed</p>
+              <p className="text-sm text-muted-foreground">{extractionError}</p>
             </div>
           </div>
         )}
@@ -148,8 +200,11 @@ export default function UploadPage() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => setInvoiceFile(null)}
-                    disabled={isReadOnly}
+                    onClick={() => {
+                      setInvoiceFile(null);
+                      setExtractionError(null);
+                    }}
+                    disabled={isReadOnly || isExtracting}
                   >
                     <X className="h-4 w-4" />
                   </Button>
@@ -204,8 +259,11 @@ export default function UploadPage() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => setW9File(null)}
-                    disabled={isReadOnly}
+                    onClick={() => {
+                      setW9File(null);
+                      setExtractionError(null);
+                    }}
+                    disabled={isReadOnly || isExtracting}
                   >
                     <X className="h-4 w-4" />
                   </Button>
@@ -291,11 +349,20 @@ export default function UploadPage() {
           <Button
             size="lg"
             onClick={handleExtract}
-            disabled={!invoiceFile || isReadOnly}
+            disabled={!invoiceFile || isReadOnly || isExtracting}
             className="gap-2 min-w-48"
           >
-            <Sparkles className="h-4 w-4" />
-            Extract Fields
+            {isExtracting ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Extracting...
+              </>
+            ) : (
+              <>
+                <Sparkles className="h-4 w-4" />
+                Extract Fields
+              </>
+            )}
           </Button>
         </div>
       </div>
