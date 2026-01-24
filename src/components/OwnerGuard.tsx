@@ -8,9 +8,10 @@ interface OwnerGuardProps {
 }
 
 export function OwnerGuard({ children }: OwnerGuardProps) {
-  const { user, loading, isOwner } = useAuth();
+  const { user, loading, ownershipLoading, isOwner } = useAuth();
 
-  if (loading) {
+  // Show loading while auth or ownership check is in progress
+  if (loading || ownershipLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
