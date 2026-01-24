@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { HeroBackground } from '@/components/HeroBackground';
 import { 
   FileText, 
   Clock, 
@@ -98,8 +99,9 @@ export default function Landing() {
       </header>
 
       {/* Hero Section */}
-      <section className="pt-32 pb-20 px-4">
-        <div className="container mx-auto text-center max-w-3xl">
+      <section className="relative pt-32 pb-20 px-4 overflow-hidden">
+        <HeroBackground />
+        <div className="container mx-auto text-center max-w-3xl relative z-10">
           <h1 className="mb-6 animate-fade-in">
             Keep production moving —
             <br />
