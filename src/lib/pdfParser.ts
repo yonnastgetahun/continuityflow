@@ -1,9 +1,9 @@
 import * as pdfjsLib from 'pdfjs-dist';
-// @ts-ignore - Worker import handled by Vite
-import worker from 'pdfjs-dist/build/pdf.worker.min.mjs';
+import workerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
 // Configure PDF.js worker using bundled version (no CDN)
-pdfjsLib.GlobalWorkerOptions.workerSrc = worker;
+// Vite will emit this worker as an asset and provide a URL string.
+pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
 
 export interface ParsedPage {
   pageNumber: number;
