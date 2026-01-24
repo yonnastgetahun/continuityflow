@@ -1,1 +1,10 @@
 project_id = "ugowwxmnescmykkikmdq"
+
+[functions.check-owner]
+verify_jwt = false
+
+[functions.start-trial]
+verify_jwt = false
+
+[functions.send-password-reset]
+verify_jwt = false
