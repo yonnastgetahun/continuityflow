@@ -7,6 +7,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { OwnerGuard } from "@/components/OwnerGuard";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
+import ResetPassword from "./pages/ResetPassword";
 import Restricted from "./pages/Restricted";
 import Upload from "./pages/Upload";
 import Review from "./pages/Review";
@@ -28,6 +29,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/restricted" element={<Restricted />} />
             <Route path="/upload" element={<OwnerGuard><Upload /></OwnerGuard>} />
             <Route path="/review" element={<OwnerGuard><Review /></OwnerGuard>} />
