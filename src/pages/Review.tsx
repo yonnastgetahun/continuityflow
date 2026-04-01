@@ -1,11 +1,12 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { AppLayout } from '@/components/AppLayout';
 import { useAuth } from '@/hooks/useAuth';
 import { PDFViewer } from '@/components/PDFViewer';
 import { ExtractionDebugPanel, ExtractionDebugInfo } from '@/components/ExtractionDebugPanel';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
@@ -30,6 +31,13 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import type { TablesInsert } from '@/integrations/supabase/types';
+import type {
+  ExtractionCandidateRecord,
+  ExtractionResult,
+  ReviewDecisionSource,
+} from '@/lib/extraction/types';
+import { flattenExtractedFields } from '@/lib/extraction/localExtractor';
 import { ParsedDocument, ExtractedFields, ExtractedField, FieldEvidence } from '@/lib/pdfParser';
 
 type FieldKey = 
@@ -39,6 +47,33 @@ type FieldKey =
 
 interface ConfirmedFields {
   [key: string]: boolean;
+}
+
+const FIELD_LABELS: Record<FieldKey, string> = {
+  vendorName: 'Vendor Name',
+  vendorAddress: 'Vendor Address',
+  vendorCity: 'Vendor City',
+  vendorState: 'Vendor State',
+  vendorZip: 'Vendor ZIP',
+  vendorTaxId: 'Vendor Tax ID',
+  vendorEmail: 'Vendor Email',
+  vendorPhone: 'Vendor Phone',
+  invoiceNumber: 'Invoice Number',
+  invoiceDate: 'Invoice Date',
+  dueDate: 'Due Date',
+  subtotal: 'Subtotal',
+  tax: 'Tax',
+  total: 'Total',
+};
+
+interface CandidateComparisonRow {
+  fieldKey: FieldKey;
+  label: string;
+  localValue: string;
+  aiValue: string;
+  currentValue: string;
+  localEvidence?: FieldEvidence;
+  aiEvidence?: FieldEvidence;
 }
 
 interface JumpToSourceProps {
@@ -162,6 +197,29 @@ const createDefaultField = (): ExtractedField => ({
   evidence: { docType: 'invoice', pageNumber: 0, snippet: 'Not found in document' },
 });
 
+function candidateToEvidence(candidate?: ExtractionCandidateRecord): FieldEvidence | undefined {
+  if (!candidate || !candidate.pageNumber || !candidate.evidenceSnippet) {
+    return undefined;
+  }
+
+  const metadata = candidate.metadata as { docType?: 'invoice' | 'w9' } | undefined;
+
+  return {
+    docType: metadata?.docType ?? 'invoice',
+    pageNumber: candidate.pageNumber,
+    snippet: candidate.evidenceSnippet,
+  };
+}
+
+function formatUsd(value: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 4,
+    maximumFractionDigits: 4,
+  }).format(value);
+}
+
 export default function ReviewPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -175,19 +233,19 @@ export default function ReviewPage() {
   const [confirmedFields, setConfirmedFields] = useState<ConfirmedFields>({});
   const [showAdvanced, setShowAdvanced] = useState(false);
 
-  const { invoiceDoc, w9Doc, extractedFields, invoiceFile, w9File, debugInfo } = (location.state || {}) as {
-    invoiceDoc?: ParsedDocument;
-    w9Doc?: ParsedDocument;
-    extractedFields?: ExtractedFields;
+  const { extractionResult, invoiceFile, w9File, debugInfo } = (location.state || {}) as {
+    extractionResult?: ExtractionResult;
     invoiceFile?: File;
     w9File?: File;
-    storeDocuments?: boolean;
     debugInfo?: ExtractionDebugInfo;
   };
+  const invoiceDoc = extractionResult?.invoiceDoc as ParsedDocument | undefined;
+  const w9Doc = extractionResult?.w9Doc as ParsedDocument | undefined;
+  const extractedFields = extractionResult?.extractedFields;
 
   const isScanned = invoiceDoc?.isScanned || w9Doc?.isScanned;
 
-  const baseFields: ExtractedFields = extractedFields || {
+  const baseFields: ExtractedFields = useMemo(() => extractedFields || {
     vendor: {
       name: createDefaultField(),
       address: createDefaultField(),
@@ -206,10 +264,10 @@ export default function ReviewPage() {
       tax: createDefaultField(),
       total: createDefaultField(),
     },
-  };
+  }, [extractedFields]);
 
   // For scanned documents, override all field confidences to 'low'
-  const getFieldWithScannedOverride = (field: ExtractedField): ExtractedField => {
+  const getFieldWithScannedOverride = useCallback((field: ExtractedField): ExtractedField => {
     if (isScanned) {
       return {
         ...field,
@@ -221,7 +279,7 @@ export default function ReviewPage() {
       };
     }
     return field;
-  };
+  }, [isScanned]);
 
   const fields: ExtractedFields = useMemo(() => ({
     vendor: {
@@ -242,7 +300,7 @@ export default function ReviewPage() {
       tax: getFieldWithScannedOverride(baseFields.invoice.tax),
       total: getFieldWithScannedOverride(baseFields.invoice.total),
     },
-  }), [isScanned, baseFields]);
+  }), [baseFields, getFieldWithScannedOverride]);
 
   // Editable fields state
   const [vendorName, setVendorName] = useState(fields.vendor.name.value);
@@ -260,6 +318,89 @@ export default function ReviewPage() {
   const [subtotal, setSubtotal] = useState(fields.invoice.subtotal.value);
   const [tax, setTax] = useState(fields.invoice.tax.value);
   const [total, setTotal] = useState(fields.invoice.total.value);
+
+  const candidateLookup = useMemo(() => {
+    const lookup: {
+      local: Partial<Record<FieldKey, ExtractionCandidateRecord>>;
+      ai: Partial<Record<FieldKey, ExtractionCandidateRecord>>;
+    } = {
+      local: {},
+      ai: {},
+    };
+
+    extractionResult?.candidates.forEach((candidate) => {
+      const fieldKey = candidate.fieldKey as FieldKey;
+      if (!(fieldKey in FIELD_LABELS)) return;
+
+      if (candidate.source === 'local') {
+        lookup.local[fieldKey] = candidate;
+      }
+
+      if (candidate.source === 'ai') {
+        lookup.ai[fieldKey] = candidate;
+      }
+    });
+
+    return lookup;
+  }, [extractionResult]);
+
+  const currentFieldValues = useMemo<Record<FieldKey, string>>(() => ({
+    vendorName,
+    vendorAddress,
+    vendorCity,
+    vendorState,
+    vendorZip,
+    vendorTaxId,
+    vendorEmail,
+    vendorPhone,
+    invoiceNumber,
+    invoiceDate,
+    dueDate,
+    subtotal,
+    tax,
+    total,
+  }), [
+    dueDate,
+    invoiceDate,
+    invoiceNumber,
+    subtotal,
+    tax,
+    total,
+    vendorAddress,
+    vendorCity,
+    vendorEmail,
+    vendorName,
+    vendorPhone,
+    vendorState,
+    vendorTaxId,
+    vendorZip,
+  ]);
+
+  const aiComparisonRows = useMemo<CandidateComparisonRow[]>(() => {
+    return (Object.keys(FIELD_LABELS) as FieldKey[])
+      .map((fieldKey) => {
+        const localCandidate = candidateLookup.local[fieldKey];
+        const aiCandidate = candidateLookup.ai[fieldKey];
+
+        if (!aiCandidate) return null;
+
+        const localValue = localCandidate?.candidateValue ?? '';
+        const aiValue = aiCandidate.candidateValue ?? '';
+
+        if (localValue === aiValue) return null;
+
+        return {
+          fieldKey,
+          label: FIELD_LABELS[fieldKey],
+          localValue,
+          aiValue,
+          currentValue: currentFieldValues[fieldKey] ?? '',
+          localEvidence: candidateToEvidence(localCandidate),
+          aiEvidence: candidateToEvidence(aiCandidate),
+        };
+      })
+      .filter((row): row is CandidateComparisonRow => row !== null);
+  }, [candidateLookup, currentFieldValues]);
 
   const handleFieldChange = (fieldKey: FieldKey, value: string, setter: (v: string) => void) => {
     setter(value);
@@ -308,7 +449,17 @@ export default function ReviewPage() {
     if (Object.keys(autoConfirm).length > 0) {
       setConfirmedFields(prev => ({ ...prev, ...autoConfirm }));
     }
-  }, [isScanned]);
+  }, [
+    isScanned,
+    baseFields.vendor.name.confidence,
+    baseFields.vendor.name.value,
+    baseFields.invoice.invoiceDate.confidence,
+    baseFields.invoice.invoiceDate.value,
+    baseFields.invoice.total.confidence,
+    baseFields.invoice.total.value,
+    baseFields.invoice.invoiceNumber.confidence,
+    baseFields.invoice.invoiceNumber.value,
+  ]);
 
   useEffect(() => {
     if (!invoiceDoc && !location.state) {
@@ -375,7 +526,7 @@ export default function ReviewPage() {
         return isNaN(num) ? null : num;
       };
 
-      const { error: invoiceError } = await supabase
+      const { data: invoice, error: invoiceError } = await supabase
         .from('invoices')
         .insert({
           user_id: user.id,
@@ -390,12 +541,107 @@ export default function ReviewPage() {
             fullText: invoiceDoc.fullText.substring(0, 10000), 
             isScanned: invoiceDoc.isScanned 
           } : null,
-        });
+        })
+        .select()
+        .single();
 
       if (invoiceError) throw invoiceError;
 
-      toast.success('Records saved successfully!');
-      navigate('/records');
+      if (extractionResult) {
+        const sessionInsert: TablesInsert<'extraction_sessions'> = {
+          user_id: user.id,
+          invoice_id: invoice.id,
+          vendor_id: vendor.id,
+          source_document_type: 'invoice',
+          mode: extractionResult.mode,
+          status: extractionResult.status,
+          requested_provider: extractionResult.requestedProvider,
+          final_provider: extractionResult.finalProvider,
+          ai_provider: extractionResult.aiProvider ?? null,
+          is_scanned: extractionResult.isScanned,
+          used_fallback: extractionResult.usedFallback,
+          failure_reason: extractionResult.failureReason ?? null,
+          ai_processed_at: extractionResult.aiProvider ? new Date().toISOString() : null,
+          ai_pages: extractionResult.usage.aiPages,
+          ai_cost_usd: extractionResult.usage.aiCostUsd,
+          completed_at: new Date().toISOString(),
+          metadata: extractionResult.metadata ?? {},
+        };
+
+        const { data: session, error: sessionError } = await supabase
+          .from('extraction_sessions')
+          .insert(sessionInsert)
+          .select()
+          .single();
+
+        if (sessionError) throw sessionError;
+
+        if (extractionResult.candidates.length > 0) {
+          const candidateRows: TablesInsert<'extraction_field_candidates'>[] = extractionResult.candidates.map(
+            (candidate) => ({
+              session_id: session.id,
+              field_key: candidate.fieldKey,
+              source: candidate.source,
+              candidate_value: candidate.candidateValue,
+              confidence: candidate.confidence,
+              page_number: candidate.pageNumber,
+              evidence_snippet: candidate.evidenceSnippet,
+              selected_for_review: candidate.selectedForReview,
+              metadata: candidate.metadata ?? {},
+            })
+          );
+
+          const { error: candidatesError } = await supabase
+            .from('extraction_field_candidates')
+            .insert(candidateRows);
+
+          if (candidatesError) throw candidatesError;
+        }
+
+        const originalFieldMap = flattenExtractedFields(extractionResult.extractedFields);
+        const finalFieldMap = currentFieldValues;
+
+        const decisionRows: TablesInsert<'review_field_decisions'>[] = (Object.entries(finalFieldMap) as Array<[FieldKey, string]>)
+          .map(([fieldKey, finalValue]) => {
+            const localValue = candidateLookup.local[fieldKey]?.candidateValue ?? originalFieldMap[fieldKey]?.value ?? null;
+            const aiValue = candidateLookup.ai[fieldKey]?.candidateValue ?? null;
+            const normalizedFinalValue = finalValue || null;
+            const userChanged = (localValue ?? '') !== (normalizedFinalValue ?? '');
+            let chosenSource: ReviewDecisionSource = 'manual';
+
+            if (!userChanged) {
+              chosenSource =
+                aiValue && normalizedFinalValue === aiValue && aiValue !== localValue
+                  ? 'ai'
+                  : 'local';
+            }
+
+            return {
+              session_id: session.id,
+              field_key: fieldKey,
+              local_value: localValue,
+              ai_value: aiValue,
+              final_value: normalizedFinalValue,
+              chosen_source: chosenSource,
+              user_changed: userChanged,
+              notes: confirmedFields[fieldKey] ? 'Reviewed in Phase 2 foundation flow' : null,
+            };
+          });
+
+        const { error: decisionsError } = await supabase
+          .from('review_field_decisions')
+          .insert(decisionRows);
+
+        if (decisionsError) throw decisionsError;
+      }
+
+      toast.success('Structured records saved. Continue to purchase order generation.');
+      navigate('/generate', {
+        state: {
+          invoiceId: invoice.id,
+          fromReview: true,
+        },
+      });
     } catch (error) {
       console.error('Error saving:', error);
       toast.error('Failed to save records. Please try again.');
@@ -415,6 +661,17 @@ export default function ReviewPage() {
               Back
             </Button>
             <h1 className="text-xl font-semibold">Review Extracted Data</h1>
+            <div className="mt-2 flex items-center gap-2">
+              {extractionResult?.finalProvider === 'ai' && (
+                <Badge variant="secondary">AI Assisted</Badge>
+              )}
+              {extractionResult?.mode === 'enhanced_accuracy' && extractionResult?.finalProvider !== 'ai' && (
+                <Badge variant="secondary">Enhanced Accuracy Requested</Badge>
+              )}
+              {extractionResult?.usedFallback && (
+                <Badge variant="outline">Using Local Fallback</Badge>
+              )}
+            </div>
           </div>
           <Button
             variant="outline"
@@ -435,6 +692,18 @@ export default function ReviewPage() {
               <p className="font-medium text-sm state-attention-text">Scanned PDF detected</p>
               <p className="text-sm text-muted-foreground">
                 OCR is not enabled yet. Please enter fields manually.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {extractionResult?.usedFallback && (
+          <div className="state-attention rounded-lg p-4 mb-4 flex items-start gap-3 animate-fade-in">
+            <Sparkles className="h-5 w-5 state-attention-text flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-medium text-sm state-attention-text">Enhanced Accuracy fallback</p>
+              <p className="text-sm text-muted-foreground">
+                {extractionResult.failureReason || 'Enhanced extraction was unavailable, so Continuity used local processing.'}
               </p>
             </div>
           </div>
@@ -508,6 +777,97 @@ export default function ReviewPage() {
           {/* Form Panel */}
           <div className="flex-1 overflow-y-auto space-y-4 pr-2">
             {/* Essential Fields Card */}
+            {(extractionResult?.mode === 'enhanced_accuracy' || extractionResult?.usedFallback) && (
+              <Card>
+                <CardHeader className="py-3 px-4">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                    Extraction Summary
+                  </CardTitle>
+                  <CardDescription>
+                    {extractionResult.finalProvider === 'ai'
+                      ? 'Enhanced Accuracy resolved this document with OpenAI and merged the result into review.'
+                      : 'Enhanced Accuracy was requested, but Continuity is currently using the local result in review.'}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4 px-4 pb-4">
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    <div className="rounded-md border bg-muted/20 p-3">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Requested</p>
+                      <p className="mt-1 text-sm font-medium">
+                        {extractionResult.mode === 'enhanced_accuracy' ? 'Enhanced Accuracy' : 'Local Only'}
+                      </p>
+                    </div>
+                    <div className="rounded-md border bg-muted/20 p-3">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Final Provider</p>
+                      <p className="mt-1 text-sm font-medium">
+                        {extractionResult.finalProvider === 'ai'
+                          ? `${extractionResult.aiProvider ?? 'AI'}`
+                          : extractionResult.finalProvider === 'fallback_local'
+                            ? 'Local fallback'
+                            : 'Local'}
+                      </p>
+                    </div>
+                    <div className="rounded-md border bg-muted/20 p-3">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">AI Usage</p>
+                      <p className="mt-1 text-sm font-medium">
+                        {extractionResult.usage.aiPages > 0
+                          ? `${extractionResult.usage.aiPages} page · ${formatUsd(extractionResult.usage.aiCostUsd)}`
+                          : 'No AI usage'}
+                      </p>
+                    </div>
+                    <div className="rounded-md border bg-muted/20 p-3">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Processing</p>
+                      <p className="mt-1 text-sm font-medium">
+                        {extractionResult.metadata?.processingMode === 'in-memory-only'
+                          ? 'In-memory only'
+                          : 'Local browser'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {aiComparisonRows.length > 0 && (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-sm font-medium">AI changes to review</p>
+                        <Badge variant="secondary">{aiComparisonRows.length} field{aiComparisonRows.length === 1 ? '' : 's'}</Badge>
+                      </div>
+                      <div className="space-y-3">
+                        {aiComparisonRows.map((row) => (
+                          <div key={row.fieldKey} className="rounded-md border p-3">
+                            <div className="flex items-center justify-between gap-3">
+                              <p className="text-sm font-medium">{row.label}</p>
+                              <Badge variant="outline">AI override</Badge>
+                            </div>
+                            <div className="mt-3 grid gap-3 md:grid-cols-3">
+                              <div className="space-y-1">
+                                <p className="text-xs uppercase tracking-wide text-muted-foreground">Local</p>
+                                <p className="text-sm">{row.localValue || '—'}</p>
+                                {row.localEvidence && (
+                                  <JumpToSourceButton evidence={row.localEvidence} onJump={handleJumpToSource} />
+                                )}
+                              </div>
+                              <div className="space-y-1">
+                                <p className="text-xs uppercase tracking-wide text-muted-foreground">AI</p>
+                                <p className="text-sm font-medium">{row.aiValue || '—'}</p>
+                                {row.aiEvidence && (
+                                  <JumpToSourceButton evidence={row.aiEvidence} onJump={handleJumpToSource} />
+                                )}
+                              </div>
+                              <div className="space-y-1">
+                                <p className="text-xs uppercase tracking-wide text-muted-foreground">Current Review Value</p>
+                                <p className="text-sm">{row.currentValue || '—'}</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
             <Card>
               <CardHeader className="py-3 px-4">
                 <CardTitle className="flex items-center gap-2 text-base">
@@ -722,7 +1082,7 @@ export default function ReviewPage() {
                 className="gap-2 min-w-48"
               >
                 <Save className="h-4 w-4" />
-                {isSaving ? 'Saving...' : 'Save Records'}
+                {isSaving ? 'Saving...' : 'Save and Continue'}
               </Button>
               {!requiredFieldsStatus.allValid && (
                 <p className="text-xs text-muted-foreground">
@@ -742,7 +1102,7 @@ export default function ReviewPage() {
               <ExtractionDebugPanel
                 invoiceDoc={invoiceDoc}
                 w9Doc={w9Doc}
-                debugInfo={debugInfo}
+                debugInfo={debugInfo ?? (extractionResult?.metadata as ExtractionDebugInfo | undefined)}
               />
             )}
           </div>

@@ -65,7 +65,7 @@ export default function UpgradePage() {
               <>You have <strong>{trialDaysLeft} days</strong> left in your Pro trial. Subscribe to keep all features.</>
             )}
             {isTrialExpired && (
-              <>Your trial has expired. Subscribe to continue using PO Maker.</>
+              <>Your trial has expired. Subscribe to continue using Continuity.</>
             )}
             {!isTrialActive && !isTrialExpired && !isSubscribed && (
               <>Start your 7-day free trial with Pro features. No credit card required.</>

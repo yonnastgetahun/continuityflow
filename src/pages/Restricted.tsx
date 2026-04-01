@@ -5,12 +5,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ShieldX, LogOut, FileText } from 'lucide-react';
 
 export default function Restricted() {
-  const { signOut, user, loading, ownershipLoading, roleLoading, isOwner, role } = useAuth();
+  const { signOut, user, loading, roleLoading, role } = useAuth();
 
-  // If the user is actually authorized (e.g. collaborator) don't leave them stranded here.
-  if (!loading && !ownershipLoading && !roleLoading && user) {
+  if (!loading && !roleLoading && user) {
     const isAuthorized =
-      isOwner || role === 'owner' || role === 'collaborator' || role === 'viewer';
+      role === 'owner' || role === 'collaborator' || role === 'viewer';
     if (isAuthorized) {
       return <Navigate to="/upload" replace />;
     }
@@ -22,7 +21,7 @@ export default function Restricted() {
         <div className="h-10 w-10 rounded-lg hero-gradient flex items-center justify-center">
           <FileText className="h-6 w-6 text-primary-foreground" />
         </div>
-        <span className="font-display font-bold text-2xl">PO Maker</span>
+        <span className="font-display font-bold text-2xl">Continuity</span>
       </Link>
 
       <Card className="w-full max-w-md animate-scale-in">
@@ -43,7 +42,7 @@ export default function Restricted() {
           </div>
 
           <p className="text-sm text-center text-muted-foreground">
-            PO Maker is currently limited to authorized accounts only. 
+            Continuity is currently limited to authorized accounts only. 
             If you believe you should have access, please contact the administrator.
           </p>
 

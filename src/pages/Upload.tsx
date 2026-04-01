@@ -1,24 +1,24 @@
-import { useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useState, useCallback } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { AppLayout } from '@/components/AppLayout';
 import { useAuth } from '@/hooks/useAuth';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
 import { 
   Upload as UploadIcon, 
   FileText, 
   X, 
   AlertCircle,
-  Shield,
   Lock,
   Sparkles,
   Loader2,
-  AlertTriangle
+  Shield
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { parsePDF, extractFieldsFromText, ParsedDocument, ExtractedFields } from '@/lib/pdfParser';
+import type { ExtractionResult } from '@/lib/extraction/types';
+import { isEnhancedAccuracyFeatureEnabled } from '@/lib/extraction/rolloutPolicy';
 
 interface UploadedFile {
   file: File;
@@ -26,19 +26,36 @@ interface UploadedFile {
   type: 'invoice' | 'w9';
 }
 
+const ENHANCED_ACCURACY_KEY = 'continuity.enhancedAccuracyEnabled';
+
 export default function UploadPage() {
-  const { profile, isReadOnly } = useAuth();
+  const { isReadOnly, profile, user } = useAuth();
   const navigate = useNavigate();
+  const enhancedAccuracyFeatureEnabled = isEnhancedAccuracyFeatureEnabled();
   const [invoiceFile, setInvoiceFile] = useState<UploadedFile | null>(null);
   const [w9File, setW9File] = useState<UploadedFile | null>(null);
-  const [storeDocuments, setStoreDocuments] = useState(false);
   const [isDragging, setIsDragging] = useState<'invoice' | 'w9' | null>(null);
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractionError, setExtractionError] = useState<string | null>(null);
+  const [enhancedAccuracyEnabled, setEnhancedAccuracyEnabled] = useState<boolean>(() => {
+    const savedPreference = window.localStorage.getItem(ENHANCED_ACCURACY_KEY);
+    return savedPreference === 'true';
+  });
 
-  const isPro = profile?.plan_type === 'pro' || 
-    (profile?.subscription_status === 'trial_active' || 
-     profile?.subscription_status === 'trial_expiring');
+  const hasEnhancedAccuracyAccess = useMemo(() => {
+    if (!profile || isReadOnly) return false;
+
+    return (
+      profile.plan_type === 'pro' ||
+      profile.subscription_status === 'trial_not_started' ||
+      profile.subscription_status === 'trial_active' ||
+      profile.subscription_status === 'trial_expiring'
+    );
+  }, [isReadOnly, profile]);
+
+  useEffect(() => {
+    window.localStorage.setItem(ENHANCED_ACCURACY_KEY, enhancedAccuracyEnabled ? 'true' : 'false');
+  }, [enhancedAccuracyEnabled]);
 
   const handleDrop = useCallback((e: React.DragEvent, type: 'invoice' | 'w9') => {
     e.preventDefault();
@@ -97,39 +114,38 @@ export default function UploadPage() {
     setExtractionError(null);
 
     try {
-      // Parse invoice PDF
-      const invoiceDoc = await parsePDF(invoiceFile.file, 'invoice');
-      
-      // Parse W9 PDF if provided
-      let w9Doc: ParsedDocument | undefined;
-      if (w9File) {
-        w9Doc = await parsePDF(w9File.file, 'w9');
-      }
+      const { extractDocuments, ENHANCED_ACCURACY_FALLBACK_REASON } = await import('@/lib/extraction/router');
+      const extractionResult: ExtractionResult = await extractDocuments({
+        invoiceFile: invoiceFile.file,
+        w9File: w9File?.file ?? null,
+        enableEnhancedAccuracy: enhancedAccuracyEnabled,
+        hasEnhancedAccess: hasEnhancedAccuracyAccess,
+        userId: user?.id ?? 'local-session',
+        planType: profile?.plan_type ?? null,
+      });
 
       // Check if documents are scanned (no text)
       const warnings: string[] = [];
-      if (invoiceDoc.isScanned) {
+      if (extractionResult.invoiceDoc.isScanned) {
         warnings.push('Invoice appears to be scanned (no selectable text). Manual entry may be required.');
       }
-      if (w9Doc?.isScanned) {
+      if (extractionResult.w9Doc?.isScanned) {
         warnings.push('W9 appears to be scanned (no selectable text). Manual entry may be required.');
       }
-
-      // Extract fields from parsed text
-      const extractedFields = extractFieldsFromText(invoiceDoc, w9Doc);
 
       // Show warnings if any
       if (warnings.length > 0) {
         warnings.forEach(warning => toast.warning(warning));
       }
 
+      if (extractionResult.usedFallback) {
+        toast.warning(extractionResult.failureReason ?? ENHANCED_ACCURACY_FALLBACK_REASON);
+      }
+
       // Navigate to review with extracted data and original files for PDF viewer
       navigate('/review', { 
         state: { 
-          invoiceDoc,
-          w9Doc,
-          extractedFields,
-          storeDocuments,
+          extractionResult,
           invoiceFile: invoiceFile.file,
           w9File: w9File?.file,
         } 
@@ -296,37 +312,63 @@ export default function UploadPage() {
           </Card>
         </div>
 
-        {/* Privacy Toggle */}
         <div className="p-5 rounded-lg border border-border bg-card animate-fade-in" style={{ animationDelay: '0.15s' }}>
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <Shield className={`h-5 w-5 mt-0.5 ${isPro ? 'text-primary' : 'text-muted-foreground'}`} />
-              <div>
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="store-docs" className="font-medium text-sm">
-                    Store encrypted documents
-                  </Label>
-                  {!isPro && (
-                    <span className="text-xs text-muted-foreground">(Pro)</span>
-                  )}
-                </div>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Keep original PDFs encrypted for future reference.
-                </p>
-              </div>
+          <div className="flex items-start gap-3">
+            <Shield className="h-5 w-5 mt-0.5 text-primary" />
+            <div>
+              <p className="font-medium text-sm">Phase 1 privacy model</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Documents are processed locally in your browser. Continuity stores only the structured fields you confirm in review.
+              </p>
             </div>
-            <Switch
-              id="store-docs"
-              checked={storeDocuments}
-              onCheckedChange={setStoreDocuments}
-              disabled={!isPro || isReadOnly}
-            />
           </div>
         </div>
 
-        {/* Privacy Notice */}
+        <div className="rounded-lg border border-border bg-card p-5 animate-fade-in" style={{ animationDelay: '0.18s' }}>
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <p className="font-medium text-sm">Enhanced Accuracy</p>
+                <Badge variant={enhancedAccuracyFeatureEnabled ? (hasEnhancedAccuracyAccess ? 'secondary' : 'outline') : 'outline'}>
+                  {!enhancedAccuracyFeatureEnabled ? 'Off' : hasEnhancedAccuracyAccess ? 'Available' : 'Pro'}
+                </Badge>
+              </div>
+              <p className="text-sm text-muted-foreground max-w-xl">
+                Recommended for scanned or complex invoices. Uses secure AI processing when available and falls back safely when it is not.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {enhancedAccuracyFeatureEnabled
+                  ? 'Documents sent for enhanced extraction are intended for temporary processing only.'
+                  : 'Enhanced Accuracy is temporarily disabled by admin rollout controls.'}
+              </p>
+            </div>
+            <Switch
+              checked={enhancedAccuracyEnabled && hasEnhancedAccuracyAccess && enhancedAccuracyFeatureEnabled}
+              disabled={!enhancedAccuracyFeatureEnabled || !hasEnhancedAccuracyAccess || isReadOnly}
+              onCheckedChange={(checked) => setEnhancedAccuracyEnabled(checked)}
+              aria-label="Enable Enhanced Accuracy"
+            />
+          </div>
+          {!enhancedAccuracyFeatureEnabled ? (
+            <div className="mt-4 rounded-md bg-muted/50 p-3">
+              <p className="text-xs text-muted-foreground">
+                Enhanced Accuracy has been disabled globally. Continuity will use local processing only.
+              </p>
+            </div>
+          ) : !hasEnhancedAccuracyAccess && (
+            <div className="mt-4 flex items-center justify-between gap-3 rounded-md bg-muted/50 p-3">
+              <p className="text-xs text-muted-foreground">
+                Enhanced Accuracy is available on Pro and during the free Pro trial.
+              </p>
+              <Button asChild size="sm" variant="outline">
+                <Link to="/upgrade">Upgrade</Link>
+              </Button>
+            </div>
+          )}
+        </div>
+
         <div className="text-center text-sm text-muted-foreground animate-fade-in" style={{ animationDelay: '0.2s' }}>
-          <p>Documents are processed locally in your browser.</p>
+          <p>Encrypted source document storage is not enabled in Phase 1.</p>
         </div>
 
         {/* Extract Button */}
@@ -340,12 +382,12 @@ export default function UploadPage() {
             {isExtracting ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Extracting...
+                {enhancedAccuracyEnabled && hasEnhancedAccuracyAccess ? 'Processing...' : 'Extracting...'}
               </>
             ) : (
               <>
                 <Sparkles className="h-4 w-4" />
-                Extract Fields
+                {enhancedAccuracyEnabled && hasEnhancedAccuracyAccess ? 'Use Enhanced Accuracy' : 'Extract Fields'}
               </>
             )}
           </Button>

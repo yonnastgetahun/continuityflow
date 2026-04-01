@@ -12,10 +12,9 @@ interface AccessGuardProps {
  * (owner/collaborator/viewer) to access protected app routes.
  */
 export function AccessGuard({ children }: AccessGuardProps) {
-  const { user, loading, ownershipLoading, roleLoading, isOwner, role } = useAuth();
+  const { user, loading, roleLoading, role } = useAuth();
 
-  // Show loading while auth/role/ownership checks are in progress
-  if (loading || ownershipLoading || roleLoading) {
+  if (loading || roleLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -27,7 +26,7 @@ export function AccessGuard({ children }: AccessGuardProps) {
     return <Navigate to="/login" replace />;
   }
 
-  const isAuthorized = isOwner || role === 'owner' || role === 'collaborator' || role === 'viewer';
+  const isAuthorized = role === 'owner' || role === 'collaborator' || role === 'viewer';
   if (!isAuthorized) {
     return <Navigate to="/restricted" replace />;
   }

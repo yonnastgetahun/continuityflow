@@ -1,4 +1,4 @@
-project_id = "ugowwxmnescmykkikmdq"
+project_id = "rdcwcfucghobizebzodz"
 
 [functions.check-owner]
 verify_jwt = false
@@ -7,4 +7,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.send-password-reset]
+verify_jwt = false
+
+[functions.enhanced-extract]
 verify_jwt = false

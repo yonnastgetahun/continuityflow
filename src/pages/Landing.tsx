@@ -61,7 +61,7 @@ const privacyFeatures = [
   "Local-first document processing",
   "Only confirmed fields saved",
   "No cloud upload required",
-  "Optional encrypted storage (Pro)"
+  "No source document storage in Phase 1"
 ];
 
 const audiences = [
@@ -89,7 +89,7 @@ export default function Landing() {
             </div>
             <div className="flex items-baseline gap-2">
               <span className="font-semibold text-lg">Continuity</span>
-              <span className="text-sm text-muted-foreground">PO Maker (Beta)</span>
+              <span className="text-sm text-muted-foreground">Phase 1</span>
             </div>
           </div>
           <Link to="/login">
@@ -109,7 +109,7 @@ export default function Landing() {
           </h1>
           
           <p className="text-lg text-muted-foreground mb-12 max-w-xl mx-auto animate-fade-in leading-relaxed" style={{ animationDelay: '0.1s' }}>
-            Create approval-ready purchase orders from W-9s and invoices — with confidence before approval.
+            Turn W-9s and invoices into clean, reviewable finance records and approval-ready purchase orders.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in" style={{ animationDelay: '0.15s' }}>
@@ -195,7 +195,7 @@ export default function Landing() {
               How it works
             </h2>
             <p className="text-muted-foreground max-w-xl mx-auto">
-              From documents to a clean purchase order — with confidence at every step.
+              From documents to clean finance records and a purchase order — with confidence at every step.
             </p>
           </div>
 
@@ -236,7 +236,7 @@ export default function Landing() {
           </h2>
           
           <p className="text-sidebar-foreground/80 mb-10 max-w-xl mx-auto">
-            Production finance involves sensitive information. Continuity processes documents locally and stores only the structured data you explicitly confirm. No documents are uploaded unless you opt in.
+            Production finance involves sensitive information. Continuity processes documents locally and stores only the structured data you explicitly confirm. Source documents are not stored in Phase 1.
           </p>
 
           <div className="grid sm:grid-cols-2 gap-4 max-w-md mx-auto text-left">
@@ -289,7 +289,7 @@ export default function Landing() {
             Continuity is just getting started.
           </h2>
           <p className="text-muted-foreground">
-            Today, Continuity helps you generate clean purchase orders.
+            Today, Continuity helps production teams move from source documents to clean records and purchase orders.
             <br />
             Next, it will help you catch issues before approval — and prevent problems before they reach accounting.
           </p>

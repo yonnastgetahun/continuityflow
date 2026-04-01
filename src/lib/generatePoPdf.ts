@@ -1,6 +1,12 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
+interface JsPdfWithPlugins extends jsPDF {
+  GState: new (options: { opacity: number }) => unknown;
+  setGState: (state: unknown) => void;
+  lastAutoTable?: { finalY: number };
+}
+
 export interface POData {
   poNumber: string;
   poDate: string;
@@ -27,7 +33,7 @@ function formatCurrency(value: string | number): string {
 }
 
 export function generatePoPdf(data: POData): jsPDF {
-  const doc = new jsPDF();
+  const doc = new jsPDF() as JsPdfWithPlugins;
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 20;
@@ -36,7 +42,7 @@ export function generatePoPdf(data: POData): jsPDF {
   // Test Mode Watermark - diagonal across entire page
   if (data.isTestMode) {
     doc.saveGraphicsState();
-    doc.setGState(new (doc as any).GState({ opacity: 0.08 }));
+    doc.setGState(new doc.GState({ opacity: 0.08 }));
     doc.setFontSize(60);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(0, 0, 0);
@@ -167,7 +173,7 @@ export function generatePoPdf(data: POData): jsPDF {
         3: { halign: 'right', cellWidth: 35 }
       }
     });
-    y = (doc as any).lastAutoTable.finalY + 10;
+    y = (doc.lastAutoTable?.finalY ?? y) + 10;
   } else {
     // Simple divider if no line items
     doc.setDrawColor(200, 200, 200);

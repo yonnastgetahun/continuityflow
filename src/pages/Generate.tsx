@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { AppLayout } from '@/components/AppLayout';
 import { useAuth } from '@/hooks/useAuth';
+import { useTestMode } from '@/hooks/useTestMode';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -10,22 +11,34 @@ import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { 
   FileOutput, 
-  Download,
   ArrowLeft,
   Building2,
   Calendar,
   Hash,
-  Loader2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
-import { downloadPoPdf, type POData } from '@/lib/generatePoPdf';
+import type { POData } from '@/lib/generatePoPdf';
+
+interface InvoiceWithVendor {
+  subtotal: number | null;
+  tax: number | null;
+  total: number | null;
+  vendors?: {
+    name: string | null;
+    address: string | null;
+    city: string | null;
+    state: string | null;
+    zip: string | null;
+  } | null;
+}
 
 export default function GeneratePage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, isReadOnly } = useAuth();
+  const { isTestMode } = useTestMode();
   const invoiceId = location.state?.invoiceId;
 
   const [loading, setLoading] = useState(true);
@@ -43,17 +56,7 @@ export default function GeneratePage() {
   const [total, setTotal] = useState('0.00');
   const [notes, setNotes] = useState('');
 
-  useEffect(() => {
-    if (invoiceId && user) {
-      fetchInvoiceData();
-    } else {
-      // Generate a new PO number
-      setPoNumber(`PO-${format(new Date(), 'yyyyMMdd')}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`);
-      setLoading(false);
-    }
-  }, [invoiceId, user]);
-
-  const fetchInvoiceData = async () => {
+  const fetchInvoiceData = useCallback(async () => {
     try {
       const { data: invoice, error } = await supabase
         .from('invoices')
@@ -70,7 +73,7 @@ export default function GeneratePage() {
         setTotal(invoice.total?.toString() || '0.00');
         
         if (invoice.vendors) {
-          const vendor = invoice.vendors as any;
+          const vendor = invoice.vendors as InvoiceWithVendor['vendors'];
           setVendorName(vendor.name || '');
           setVendorAddress(
             [vendor.address, vendor.city, vendor.state, vendor.zip]
@@ -85,7 +88,16 @@ export default function GeneratePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [invoiceId]);
+
+  useEffect(() => {
+    if (invoiceId && user) {
+      fetchInvoiceData();
+    } else {
+      setPoNumber(`PO-${format(new Date(), 'yyyyMMdd')}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`);
+      setLoading(false);
+    }
+  }, [fetchInvoiceData, invoiceId, user]);
 
   // Build PO data object for PDF generation
   const buildPoData = (): POData => ({
@@ -99,6 +111,7 @@ export default function GeneratePage() {
     tax,
     total,
     notes,
+    isTestMode,
   });
 
   const handleGenerate = async () => {
@@ -126,7 +139,7 @@ export default function GeneratePage() {
           tax: parseFloat(tax),
           total: parseFloat(total),
           notes: notes,
-          status: 'generated',
+          status: isTestMode ? 'test_generated' : 'generated',
         })
         .select()
         .single();
@@ -136,6 +149,7 @@ export default function GeneratePage() {
       // 3. Generate and download PDF
       const poData = buildPoData();
       try {
+        const { downloadPoPdf } = await import('@/lib/generatePoPdf');
         await downloadPoPdf(poData);
         
         // 4. Update status to exported with timestamp
@@ -147,7 +161,7 @@ export default function GeneratePage() {
           })
           .eq('id', po.id);
 
-        toast.success('Purchase Order exported successfully!');
+        toast.success(isTestMode ? 'Test purchase order exported successfully!' : 'Purchase order exported successfully!');
       } catch (pdfError) {
         console.error('PDF generation failed:', pdfError);
         toast.error('PDF download failed. You can try again from the next screen.');
@@ -189,7 +203,7 @@ export default function GeneratePage() {
           </Button>
           <h1 className="text-2xl font-semibold">Generate Purchase Order</h1>
           <p className="text-muted-foreground text-sm">
-            Review and customize before exporting.
+            Review and customize before exporting from Continuity.
           </p>
         </div>
 

@@ -19,7 +19,6 @@ interface AuthContextType {
   session: Session | null;
   profile: Profile | null;
   loading: boolean;
-  ownershipLoading: boolean;
   roleLoading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string) => Promise<{ error: Error | null }>;
@@ -44,9 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [ownershipLoading, setOwnershipLoading] = useState(false);
   const [roleLoading, setRoleLoading] = useState(false);
-  const [isOwnerState, setIsOwnerState] = useState(false);
   const [role, setRole] = useState<AppRole>(null);
 
   const fetchProfile = async (userId: string) => {
@@ -83,23 +80,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const checkOwnership = async () => {
-    setOwnershipLoading(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('check-owner');
-      if (data && !error) {
-        setIsOwnerState(data.isOwner === true);
-      } else {
-        setIsOwnerState(false);
-      }
-    } catch (e) {
-      console.error('Error checking ownership:', e);
-      setIsOwnerState(false);
-    } finally {
-      setOwnershipLoading(false);
-    }
-  };
-
   const refreshProfile = async () => {
     if (user) {
       await fetchProfile(user.id);
@@ -117,13 +97,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setTimeout(() => {
             fetchProfile(session.user.id);
             fetchRole(session.user.id);
-            checkOwnership();
           }, 0);
         } else {
           setProfile(null);
           setRole(null);
-          setIsOwnerState(false);
-          setOwnershipLoading(false);
           setRoleLoading(false);
         }
       }
@@ -135,7 +112,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (session?.user) {
         fetchProfile(session.user.id);
         fetchRole(session.user.id);
-        await checkOwnership();
       }
       setLoading(false);
     });
@@ -193,7 +169,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { error } = await supabase.auth.updateUser({ password });
     return { error: error as Error | null };
   };
-  const isOwner = isOwnerState;
+  const isOwner = role === 'owner';
   const environment = getEnvironment();
 
   // Calculate trial days left
@@ -222,7 +198,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       session,
       profile,
       loading,
-      ownershipLoading,
       roleLoading,
       signIn,
       signUp,

@@ -75,6 +75,10 @@ interface PatternConfig {
   excludePatterns?: RegExp[]; // Patterns to exclude from matches
 }
 
+interface PdfTextItem {
+  str?: string;
+}
+
 // Placeholder/label patterns to exclude from vendor name extraction
 const VENDOR_EXCLUDE_PATTERNS = [
   /customer\s*name/i,
@@ -100,7 +104,7 @@ const formatValidators = {
   date: (value: string): number => {
     // Check various date formats
     const datePatterns = [
-      /^\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}$/, // MM/DD/YYYY, DD-MM-YYYY
+      /^\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}$/, // MM/DD/YYYY, DD-MM-YYYY
       /^[A-Za-z]+\s+\d{1,2},?\s+\d{4}$/, // Nov 26, 2016
       /^\d{4}-\d{2}-\d{2}$/, // 2016-11-26 (ISO)
       /^[A-Za-z]+\s+\d{1,2}(st|nd|rd|th)?,?\s+\d{4}$/i, // November 26th, 2016
@@ -109,7 +113,7 @@ const formatValidators = {
       if (pattern.test(value.trim())) return 1;
     }
     // Partial match if it contains date-like components
-    if (/\d{1,4}[\/.-]\d{1,2}/.test(value)) return 0.5;
+    if (/\d{1,4}[/.-]\d{1,2}/.test(value)) return 0.5;
     return 0.2;
   },
   
@@ -398,7 +402,7 @@ function extractVendorName(
     if (isExcluded) continue;
     
     // Skip lines that are just numbers or dates
-    if (/^\d+$/.test(line) || /^\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}$/.test(line)) continue;
+    if (/^\d+$/.test(line) || /^\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}$/.test(line)) continue;
     
     // Score the line
     const hasCompanyIndicator = /\b(Inc\.?|LLC|Ltd\.?|Corp\.?|Company|Co\.?|Corporation|Incorporated|Limited|Pty|GmbH|S\.?A\.?|PLC)\b/i.test(line);
@@ -462,7 +466,7 @@ export async function parsePDF(
       const textContent = await page.getTextContent();
       
       const pageText = textContent.items
-        .map((item: any) => item.str)
+        .map((item) => (item as PdfTextItem).str ?? '')
         .join(' ')
         .replace(/\s+/g, ' ')
         .trim();
@@ -622,7 +626,7 @@ export function extractFieldsFromText(
       // Invoice Date - parse multiple formats
       invoiceDate: extractField(invoicePages, 'invoice', [
         {
-          pattern: /(?:Invoice\s*Date|Date\s*of\s*Invoice)[:\s]*(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})/i,
+          pattern: /(?:Invoice\s*Date|Date\s*of\s*Invoice)[:\s]*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})/i,
           labelKeywords: ['invoice date', 'date of invoice'],
           formatValidator: formatValidators.date,
         },
@@ -637,7 +641,7 @@ export function extractFieldsFromText(
           formatValidator: formatValidators.date,
         },
         {
-          pattern: /(?:Date)[:\s]*(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})/i,
+          pattern: /(?:Date)[:\s]*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})/i,
           labelKeywords: ['date', 'issued'],
           formatValidator: formatValidators.date,
         },
@@ -645,7 +649,7 @@ export function extractFieldsFromText(
       
       dueDate: extractField(invoicePages, 'invoice', [
         {
-          pattern: /(?:Due\s*Date|Payment\s*Due|Due\s*By)[:\s]*(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4})/i,
+          pattern: /(?:Due\s*Date|Payment\s*Due|Due\s*By)[:\s]*(\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4})/i,
           labelKeywords: ['due date', 'payment due', 'due by', 'pay by'],
           formatValidator: formatValidators.date,
         },

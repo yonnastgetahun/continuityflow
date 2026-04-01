@@ -4,14 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { 
   CheckCircle, 
-  Download, 
   FileText,
   ArrowRight,
   ClipboardList,
   Loader2,
   RefreshCw
 } from 'lucide-react';
-import { downloadPoPdf, type POData } from '@/lib/generatePoPdf';
+import type { POData } from '@/lib/generatePoPdf';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -24,6 +23,7 @@ export default function ExportedPage() {
   };
   
   const [downloading, setDownloading] = useState(false);
+  const isTestDocument = Boolean((poData as POData | null)?.isTestMode);
 
   const handleDownload = async () => {
     if (!poData) {
@@ -33,6 +33,7 @@ export default function ExportedPage() {
 
     setDownloading(true);
     try {
+      const { downloadPoPdf } = await import('@/lib/generatePoPdf');
       await downloadPoPdf(poData as POData);
       
       // Update exported_at timestamp
@@ -46,7 +47,7 @@ export default function ExportedPage() {
           .eq('id', poId);
       }
       
-      toast.success('PDF downloaded successfully!');
+      toast.success(isTestDocument ? 'Test PDF downloaded successfully!' : 'PDF downloaded successfully!');
     } catch (error) {
       console.error('PDF download failed:', error);
       toast.error('Failed to generate PDF. Please try again.');
@@ -63,10 +64,11 @@ export default function ExportedPage() {
         </div>
 
         <h1 className="font-display text-3xl font-bold mb-2">
-          Purchase Order Created!
+          {isTestDocument ? 'Test Purchase Order Created!' : 'Purchase Order Created!'}
         </h1>
         <p className="text-muted-foreground mb-8">
           Your purchase order <span className="font-mono font-medium text-foreground">{poNumber}</span> has been generated successfully.
+          {isTestDocument ? ' This copy is watermarked and non-billable.' : ''}
         </p>
 
         <Card className="mb-8">
@@ -76,7 +78,9 @@ export default function ExportedPage() {
                 <FileText className="h-8 w-8 text-primary" />
                 <div className="text-left">
                   <p className="font-medium">{poNumber}.pdf</p>
-                  <p className="text-sm text-muted-foreground">Purchase Order Document</p>
+                  <p className="text-sm text-muted-foreground">
+                    {isTestDocument ? 'Watermarked test purchase order' : 'Purchase order document'}
+                  </p>
                 </div>
               </div>
               <Button 
@@ -102,7 +106,7 @@ export default function ExportedPage() {
             
             <p className="text-sm text-muted-foreground">
               {poData 
-                ? 'You can download the PDF again anytime from this page or your Records.'
+                ? 'You can download the PDF again anytime from this page or your records.'
                 : 'PDF data not available. Generate a new PO to download.'
               }
             </p>
@@ -118,7 +122,7 @@ export default function ExportedPage() {
           </Link>
           <Link to="/upload">
             <Button className="gap-2 w-full sm:w-auto">
-              Create Another PO
+              Start Another Workflow
               <ArrowRight className="h-4 w-4" />
             </Button>
           </Link>

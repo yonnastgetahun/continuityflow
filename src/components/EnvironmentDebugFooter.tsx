@@ -6,10 +6,9 @@ import { getEnvironment, getEnvironmentSource } from '@/lib/environment';
  * Only visible to owners/admins.
  */
 export function EnvironmentDebugFooter() {
-  const { isOwner, role } = useAuth();
-  
-  // Only show to owners or users with owner role
-  const isAdmin = isOwner || role === 'owner';
+  const { role } = useAuth();
+
+  const isAdmin = role === 'owner';
   if (!isAdmin) return null;
 
   const env = getEnvironment();

@@ -67,7 +67,7 @@ export function PDFViewer({
     if (currentPage && currentPage !== pageNum && currentPage >= 1 && currentPage <= numPages) {
       setPageNum(currentPage);
     }
-  }, [currentPage, numPages]);
+  }, [currentPage, numPages, pageNum]);
 
   // Render current page
   const renderPage = useCallback(async () => {

@@ -14,6 +14,23 @@ export default defineConfig(({ mode }) => ({
   },
   build: {
     target: "esnext",
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("pdfjs-dist")) {
+            return "pdf-parser";
+          }
+
+          if (id.includes("jspdf") || id.includes("jspdf-autotable")) {
+            return "pdf-export";
+          }
+
+          if (id.includes("node_modules")) {
+            return "vendor";
+          }
+        },
+      },
+    },
   },
   optimizeDeps: {
     esbuildOptions: {

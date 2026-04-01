@@ -69,6 +69,150 @@ export type Database = {
           },
         ]
       }
+      extraction_field_candidates: {
+        Row: {
+          candidate_value: string | null
+          confidence: Database["public"]["Enums"]["extraction_confidence"]
+          created_at: string
+          evidence_snippet: string | null
+          field_key: string
+          id: string
+          metadata: Json
+          page_number: number | null
+          selected_for_review: boolean
+          session_id: string
+          source: Database["public"]["Enums"]["extraction_provider"]
+        }
+        Insert: {
+          candidate_value?: string | null
+          confidence?: Database["public"]["Enums"]["extraction_confidence"]
+          created_at?: string
+          evidence_snippet?: string | null
+          field_key: string
+          id?: string
+          metadata?: Json
+          page_number?: number | null
+          selected_for_review?: boolean
+          session_id: string
+          source: Database["public"]["Enums"]["extraction_provider"]
+        }
+        Update: {
+          candidate_value?: string | null
+          confidence?: Database["public"]["Enums"]["extraction_confidence"]
+          created_at?: string
+          evidence_snippet?: string | null
+          field_key?: string
+          id?: string
+          metadata?: Json
+          page_number?: number | null
+          selected_for_review?: boolean
+          session_id?: string
+          source?: Database["public"]["Enums"]["extraction_provider"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "extraction_field_candidates_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "extraction_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      extraction_sessions: {
+        Row: {
+          ai_cost_usd: number
+          ai_pages: number
+          ai_processed_at: string | null
+          ai_provider: string | null
+          completed_at: string | null
+          created_at: string
+          failure_reason: string | null
+          final_provider: Database["public"]["Enums"]["extraction_provider"] | null
+          id: string
+          invoice_id: string | null
+          is_scanned: boolean
+          metadata: Json
+          mode: Database["public"]["Enums"]["extraction_mode"]
+          requested_provider: Database["public"]["Enums"]["extraction_provider"]
+          source_document_type: string
+          started_at: string
+          status: Database["public"]["Enums"]["extraction_status"]
+          updated_at: string
+          used_fallback: boolean
+          user_id: string
+          vendor_id: string | null
+        }
+        Insert: {
+          ai_cost_usd?: number
+          ai_pages?: number
+          ai_processed_at?: string | null
+          ai_provider?: string | null
+          completed_at?: string | null
+          created_at?: string
+          failure_reason?: string | null
+          final_provider?: Database["public"]["Enums"]["extraction_provider"] | null
+          id?: string
+          invoice_id?: string | null
+          is_scanned?: boolean
+          metadata?: Json
+          mode?: Database["public"]["Enums"]["extraction_mode"]
+          requested_provider?: Database["public"]["Enums"]["extraction_provider"]
+          source_document_type?: string
+          started_at?: string
+          status?: Database["public"]["Enums"]["extraction_status"]
+          updated_at?: string
+          used_fallback?: boolean
+          user_id: string
+          vendor_id?: string | null
+        }
+        Update: {
+          ai_cost_usd?: number
+          ai_pages?: number
+          ai_processed_at?: string | null
+          ai_provider?: string | null
+          completed_at?: string | null
+          created_at?: string
+          failure_reason?: string | null
+          final_provider?: Database["public"]["Enums"]["extraction_provider"] | null
+          id?: string
+          invoice_id?: string | null
+          is_scanned?: boolean
+          metadata?: Json
+          mode?: Database["public"]["Enums"]["extraction_mode"]
+          requested_provider?: Database["public"]["Enums"]["extraction_provider"]
+          source_document_type?: string
+          started_at?: string
+          status?: Database["public"]["Enums"]["extraction_status"]
+          updated_at?: string
+          used_fallback?: boolean
+          user_id?: string
+          vendor_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "extraction_sessions_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extraction_sessions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extraction_sessions_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoices: {
         Row: {
           created_at: string
@@ -247,6 +391,56 @@ export type Database = {
           },
         ]
       }
+      review_field_decisions: {
+        Row: {
+          ai_value: string | null
+          chosen_source: Database["public"]["Enums"]["review_decision_source"]
+          created_at: string
+          field_key: string
+          final_value: string | null
+          id: string
+          local_value: string | null
+          notes: string | null
+          reviewed_at: string
+          session_id: string
+          user_changed: boolean
+        }
+        Insert: {
+          ai_value?: string | null
+          chosen_source?: Database["public"]["Enums"]["review_decision_source"]
+          created_at?: string
+          field_key: string
+          final_value?: string | null
+          id?: string
+          local_value?: string | null
+          notes?: string | null
+          reviewed_at?: string
+          session_id: string
+          user_changed?: boolean
+        }
+        Update: {
+          ai_value?: string | null
+          chosen_source?: Database["public"]["Enums"]["review_decision_source"]
+          created_at?: string
+          field_key?: string
+          final_value?: string | null
+          id?: string
+          local_value?: string | null
+          notes?: string | null
+          reviewed_at?: string
+          session_id?: string
+          user_changed?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "review_field_decisions_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "extraction_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -270,6 +464,47 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      ai_usage_monthly: {
+        Row: {
+          ai_cost_usd: number
+          ai_docs: number
+          ai_pages: number
+          created_at: string
+          id: string
+          updated_at: string
+          usage_month: string
+          user_id: string
+        }
+        Insert: {
+          ai_cost_usd?: number
+          ai_docs?: number
+          ai_pages?: number
+          created_at?: string
+          id?: string
+          updated_at?: string
+          usage_month: string
+          user_id: string
+        }
+        Update: {
+          ai_cost_usd?: number
+          ai_docs?: number
+          ai_pages?: number
+          created_at?: string
+          id?: string
+          updated_at?: string
+          usage_month?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_usage_monthly_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       vendors: {
         Row: {
@@ -343,7 +578,12 @@ export type Database = {
     }
     Enums: {
       app_role: "owner" | "collaborator" | "viewer"
+      extraction_confidence: "high" | "medium" | "low"
+      extraction_mode: "local_only" | "enhanced_accuracy"
+      extraction_provider: "local" | "ai" | "fallback_local" | "fused"
+      extraction_status: "processing" | "completed" | "failed" | "cancelled"
       plan_type: "pilot" | "pro"
+      review_decision_source: "local" | "ai" | "heuristic" | "fused" | "manual"
       subscription_status:
         | "trial_not_started"
         | "trial_active"
@@ -478,7 +718,12 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["owner", "collaborator", "viewer"],
+      extraction_confidence: ["high", "medium", "low"],
+      extraction_mode: ["local_only", "enhanced_accuracy"],
+      extraction_provider: ["local", "ai", "fallback_local", "fused"],
+      extraction_status: ["processing", "completed", "failed", "cancelled"],
       plan_type: ["pilot", "pro"],
+      review_decision_source: ["local", "ai", "heuristic", "fused", "manual"],
       subscription_status: [
         "trial_not_started",
         "trial_active",
