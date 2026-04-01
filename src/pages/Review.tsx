@@ -27,6 +27,7 @@ import {
   UserCheck,
   CircleDot,
   ScanLine,
+  Sparkles,
   ChevronDown
 } from 'lucide-react';
 import { toast } from 'sonner';
