@@ -660,7 +660,7 @@ export default function ReviewPage() {
               <ArrowLeft className="h-4 w-4" />
               Back
             </Button>
-            <h1 className="text-xl font-semibold">Review Extracted Data</h1>
+            <h1 className="text-xl font-semibold" data-testid="review-heading">Review Extracted Data</h1>
             <div className="mt-2 flex items-center gap-2">
               {extractionResult?.finalProvider === 'ai' && (
                 <Badge variant="secondary">AI Assisted</Badge>
@@ -778,7 +778,7 @@ export default function ReviewPage() {
           <div className="flex-1 overflow-y-auto space-y-4 pr-2">
             {/* Essential Fields Card */}
             {(extractionResult?.mode === 'enhanced_accuracy' || extractionResult?.usedFallback) && (
-              <Card>
+              <Card data-testid="extraction-summary-card">
                 <CardHeader className="py-3 px-4">
                   <CardTitle className="flex items-center gap-2 text-base">
                     <Sparkles className="h-4 w-4 text-primary" />
@@ -1080,6 +1080,7 @@ export default function ReviewPage() {
                 onClick={handleSave}
                 disabled={isSaving || isReadOnly || !requiredFieldsStatus.allValid}
                 className="gap-2 min-w-48"
+                data-testid="save-continue-button"
               >
                 <Save className="h-4 w-4" />
                 {isSaving ? 'Saving...' : 'Save and Continue'}

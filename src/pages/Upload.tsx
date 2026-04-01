@@ -245,6 +245,7 @@ export default function UploadPage() {
                     type="file"
                     accept=".pdf"
                     className="hidden"
+                    data-testid="invoice-file-input"
                     onChange={(e) => handleFileSelect(e, 'invoice')}
                     disabled={isReadOnly}
                   />
@@ -303,6 +304,7 @@ export default function UploadPage() {
                     type="file"
                     accept=".pdf"
                     className="hidden"
+                    data-testid="w9-file-input"
                     onChange={(e) => handleFileSelect(e, 'w9')}
                     disabled={isReadOnly}
                   />
@@ -347,6 +349,7 @@ export default function UploadPage() {
               disabled={!enhancedAccuracyFeatureEnabled || !hasEnhancedAccuracyAccess || isReadOnly}
               onCheckedChange={(checked) => setEnhancedAccuracyEnabled(checked)}
               aria-label="Enable Enhanced Accuracy"
+              data-testid="enhanced-accuracy-toggle"
             />
           </div>
           {!enhancedAccuracyFeatureEnabled ? (
@@ -378,6 +381,7 @@ export default function UploadPage() {
             onClick={handleExtract}
             disabled={!invoiceFile || isReadOnly || isExtracting}
             className="gap-2 px-8"
+            data-testid="extract-button"
           >
             {isExtracting ? (
               <>
