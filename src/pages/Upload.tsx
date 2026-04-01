@@ -19,6 +19,10 @@ import {
 import { toast } from 'sonner';
 import type { ExtractionResult } from '@/lib/extraction/types';
 import { isEnhancedAccuracyFeatureEnabled } from '@/lib/extraction/rolloutPolicy';
+import {
+  getUploadExtractionModeSummary,
+  getUploadExtractionStatusMessage,
+} from '@/lib/extraction/ui';
 
 interface UploadedFile {
   file: File;
@@ -52,6 +56,18 @@ export default function UploadPage() {
       profile.subscription_status === 'trial_expiring'
     );
   }, [isReadOnly, profile]);
+
+  const extractionModeSummary = useMemo(() => getUploadExtractionModeSummary({
+    featureEnabled: enhancedAccuracyFeatureEnabled,
+    hasEnhancedAccess: hasEnhancedAccuracyAccess,
+    forcedEnhancedAccuracy: enhancedAccuracyEnabled,
+  }), [enhancedAccuracyEnabled, enhancedAccuracyFeatureEnabled, hasEnhancedAccuracyAccess]);
+
+  const extractionStatusMessage = useMemo(() => getUploadExtractionStatusMessage({
+    featureEnabled: enhancedAccuracyFeatureEnabled,
+    hasEnhancedAccess: hasEnhancedAccuracyAccess,
+    forcedEnhancedAccuracy: enhancedAccuracyEnabled,
+  }), [enhancedAccuracyEnabled, enhancedAccuracyFeatureEnabled, hasEnhancedAccuracyAccess]);
 
   useEffect(() => {
     window.localStorage.setItem(ENHANCED_ACCURACY_KEY, enhancedAccuracyEnabled ? 'true' : 'false');
@@ -330,17 +346,17 @@ export default function UploadPage() {
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <p className="font-medium text-sm">Enhanced Accuracy</p>
+                <p className="font-medium text-sm">Force Enhanced Extraction</p>
                 <Badge variant={enhancedAccuracyFeatureEnabled ? (hasEnhancedAccuracyAccess ? 'secondary' : 'outline') : 'outline'}>
-                  {!enhancedAccuracyFeatureEnabled ? 'Off' : hasEnhancedAccuracyAccess ? 'Available' : 'Pro'}
+                  {!enhancedAccuracyFeatureEnabled ? 'Local only' : enhancedAccuracyEnabled && hasEnhancedAccuracyAccess ? 'Forced' : hasEnhancedAccuracyAccess ? 'Automatic when needed' : 'Pro'}
                 </Badge>
               </div>
               <p className="text-sm text-muted-foreground max-w-xl">
-                Recommended for scanned or complex invoices. Uses secure AI processing when available and falls back safely when it is not.
+                {extractionModeSummary}
               </p>
               <p className="text-xs text-muted-foreground">
                 {enhancedAccuracyFeatureEnabled
-                  ? 'Documents sent for enhanced extraction are intended for temporary processing only.'
+                  ? 'Enhanced extraction uses temporary AI processing only and falls back safely when it is unavailable.'
                   : 'Enhanced Accuracy is temporarily disabled by admin rollout controls.'}
               </p>
             </div>
@@ -351,6 +367,11 @@ export default function UploadPage() {
               aria-label="Enable Enhanced Accuracy"
               data-testid="enhanced-accuracy-toggle"
             />
+          </div>
+          <div className="mt-4 rounded-md bg-muted/50 p-3">
+            <p className="text-xs text-muted-foreground">
+              {extractionModeSummary}
+            </p>
           </div>
           {!enhancedAccuracyFeatureEnabled ? (
             <div className="mt-4 rounded-md bg-muted/50 p-3">
@@ -386,16 +407,21 @@ export default function UploadPage() {
             {isExtracting ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                {enhancedAccuracyEnabled && hasEnhancedAccuracyAccess ? 'Processing...' : 'Extracting...'}
+                {enhancedAccuracyEnabled && hasEnhancedAccuracyAccess ? 'Forcing Enhanced Extraction...' : 'Extracting...'}
               </>
             ) : (
               <>
                 <Sparkles className="h-4 w-4" />
-                {enhancedAccuracyEnabled && hasEnhancedAccuracyAccess ? 'Use Enhanced Accuracy' : 'Extract Fields'}
+                {enhancedAccuracyEnabled && hasEnhancedAccuracyAccess ? 'Force Enhanced Extraction' : 'Extract Fields'}
               </>
             )}
           </Button>
         </div>
+        {isExtracting && (
+          <div className="mt-3 text-center" data-testid="extraction-status-message">
+            <p className="text-xs text-muted-foreground">{extractionStatusMessage}</p>
+          </div>
+        )}
       </div>
     </AppLayout>
   );

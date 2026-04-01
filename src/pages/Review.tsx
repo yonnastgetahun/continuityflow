@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { AppLayout } from '@/components/AppLayout';
 import { useAuth } from '@/hooks/useAuth';
 import { PDFViewer } from '@/components/PDFViewer';
@@ -39,6 +39,7 @@ import type {
   ReviewDecisionSource,
 } from '@/lib/extraction/types';
 import { flattenExtractedFields } from '@/lib/extraction/localExtractor';
+import { getReviewRoutingReasonLabel, type ReviewRoutingReason } from '@/lib/extraction/ui';
 import { ParsedDocument, ExtractedFields, ExtractedField, FieldEvidence } from '@/lib/pdfParser';
 
 type FieldKey = 
@@ -403,6 +404,44 @@ export default function ReviewPage() {
       .filter((row): row is CandidateComparisonRow => row !== null);
   }, [candidateLookup, currentFieldValues]);
 
+  const routingReason = useMemo<ReviewRoutingReason>(() => {
+    const automaticReason = extractionResult?.metadata?.automaticRoutingReason;
+    if (automaticReason === 'scanned_document' || automaticReason === 'low_confidence_required_fields') {
+      return automaticReason;
+    }
+
+    if (extractionResult?.mode === 'enhanced_accuracy') {
+      return 'manual_request';
+    }
+
+    return null;
+  }, [extractionResult]);
+
+  const routingReasonLabel = useMemo(
+    () => getReviewRoutingReasonLabel(routingReason),
+    [routingReason]
+  );
+
+  const summaryDescription = useMemo(() => {
+    if (!extractionResult) return '';
+
+    if (extractionResult.usedFallback) {
+      return 'Enhanced extraction was attempted, but Continuity is currently using the local result in review.';
+    }
+
+    if (routingReason === 'manual_request') {
+      return 'You forced enhanced extraction for this document, and Continuity merged the result into review.';
+    }
+
+    if (routingReasonLabel) {
+      return `${routingReasonLabel}. Continuity automatically used enhanced extraction and merged the result into review.`;
+    }
+
+    return extractionResult.finalProvider === 'ai'
+      ? 'Enhanced Accuracy resolved this document with OpenAI and merged the result into review.'
+      : 'Continuity is currently using the local result in review.';
+  }, [extractionResult, routingReason, routingReasonLabel]);
+
   const handleFieldChange = (fieldKey: FieldKey, value: string, setter: (v: string) => void) => {
     setter(value);
     // When user edits, mark as confirmed (they've reviewed it)
@@ -461,12 +500,6 @@ export default function ReviewPage() {
     baseFields.invoice.invoiceNumber.confidence,
     baseFields.invoice.invoiceNumber.value,
   ]);
-
-  useEffect(() => {
-    if (!invoiceDoc && !location.state) {
-      navigate('/upload');
-    }
-  }, [navigate, invoiceDoc, location.state]);
 
   const handleJumpToSource = (evidence: FieldEvidence) => {
     setActiveDoc(evidence.docType);
@@ -651,6 +684,31 @@ export default function ReviewPage() {
     }
   };
 
+  if (!extractionResult || !invoiceFile) {
+    return (
+      <AppLayout>
+        <div className="max-w-2xl mx-auto section-gap">
+          <Card data-testid="review-recovery-card">
+            <CardHeader>
+              <CardTitle>Review session unavailable</CardTitle>
+              <CardDescription>
+                Your extracted review state is no longer in memory. Return to upload and run extraction again.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-wrap gap-3">
+              <Button asChild>
+                <Link to="/upload">Return to Upload</Link>
+              </Button>
+              <Button variant="outline" asChild>
+                <Link to="/records">Go to Records</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </AppLayout>
+    );
+  }
+
   return (
     <AppLayout>
       <div className="h-[calc(100vh-8rem)] flex flex-col">
@@ -785,14 +843,10 @@ export default function ReviewPage() {
                     <Sparkles className="h-4 w-4 text-primary" />
                     Extraction Summary
                   </CardTitle>
-                  <CardDescription>
-                    {extractionResult.finalProvider === 'ai'
-                      ? 'Enhanced Accuracy resolved this document with OpenAI and merged the result into review.'
-                      : 'Enhanced Accuracy was requested, but Continuity is currently using the local result in review.'}
-                  </CardDescription>
+                  <CardDescription>{summaryDescription}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4 px-4 pb-4">
-                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
                     <div className="rounded-md border bg-muted/20 p-3">
                       <p className="text-xs uppercase tracking-wide text-muted-foreground">Requested</p>
                       <p className="mt-1 text-sm font-medium">
@@ -807,6 +861,12 @@ export default function ReviewPage() {
                           : extractionResult.finalProvider === 'fallback_local'
                             ? 'Local fallback'
                             : 'Local'}
+                      </p>
+                    </div>
+                    <div className="rounded-md border bg-muted/20 p-3">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Routing Reason</p>
+                      <p className="mt-1 text-sm font-medium">
+                        {routingReasonLabel ?? 'No escalation'}
                       </p>
                     </div>
                     <div className="rounded-md border bg-muted/20 p-3">
