@@ -20,8 +20,8 @@ const passwordSchema = z.object({
 
 // Environment URLs for mismatch redirect
 const ENV_URLS = {
-  test: import.meta.env.VITE_TEST_URL || 'https://id-preview--bce1c03f-b940-4820-b637-57ba85d99401.lovable.app',
-  production: import.meta.env.VITE_PROD_URL || 'https://po-maker-magic.lovable.app',
+  test: import.meta.env.VITE_TEST_URL || 'https://continuityflow.vercel.app',
+  production: import.meta.env.VITE_PROD_URL || 'https://www.continuityflow.com',
 };
 
 export default function ResetPassword() {

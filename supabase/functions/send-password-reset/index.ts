@@ -182,7 +182,7 @@ serve(async (req: Request): Promise<Response> => {
 
     // Send the email
     const { data: emailData, error: sendError } = await resend.emails.send({
-      from: "Continuity <noreply@resend.dev>",
+      from: "Continuity <noreply@continuityflow.com>",
       to: [email],
       subject: `${brandName} — Reset your password`,
       html: emailHtml,
